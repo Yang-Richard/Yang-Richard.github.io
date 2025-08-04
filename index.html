@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do Board</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="nav-sidebar">
+            <button id="todoNavBtn" class="nav-sidebar-btn" data-panel="todo">
+                <span class="nav-text">TODO</span>
+            </button>
+            <button id="backburnerNavBtn" class="nav-sidebar-btn" data-panel="backburner">
+                <span class="nav-text">BACKBURNER</span>
+            </button>
+            <button id="recurringNavBtn" class="nav-sidebar-btn" data-panel="recurring">
+                <span class="nav-text">RECURRING</span>
+            </button>
+            <button id="trashNavBtn" class="nav-sidebar-btn" data-panel="trash">
+                <span class="nav-text">TRASH</span>
+            </button>
+            <button id="notesNavBtn" class="nav-sidebar-btn" data-panel="notes">
+                <span class="nav-text">NOTES</span>
+            </button>
+            <button id="sketchNavBtn" class="nav-sidebar-btn" data-panel="sketch">
+                <span class="nav-text">SKETCH</span>
+            </button>
+            <button id="settingsNavBtn" class="nav-sidebar-btn" data-panel="settings">
+                <span class="nav-text">SETTINGS</span>
+            </button>
+            <button id="wikiNavBtn" class="nav-sidebar-btn" data-panel="wiki">
+                <span class="nav-text">WIKI</span>
+            </button>
+        </div>
+        <div class="main-layout">
+            <div class="left-panel" id="todoPanel">
+                <div class="input-section">
+                    <textarea id="todoInput" placeholder="Enter a new todo item..." rows="3"></textarea>
+                    <div class="due-date-section">
+                        <div class="date-priority-row">
+                            <input type="date" id="dueDateInput">
+                            <label for="dueDateInput">Due Date</label>
+                            <label class="priority-toggle">
+                                Urgent
+                                <input type="checkbox" id="highPriorityInput">
+                            </label>
+                        </div>
+                    </div>
+                    <button id="addBtn">Add Todo (or press Enter)</button>
+                </div>
+                
+                <div class="unsorted-pane">
+                    <h3>New Items <span id="newItemsCount" class="item-count">(0)</span></h3>
+                    <div class="items" id="unsortedItems"></div>
+                </div>
+            </div>
+            
+            <div class="center-section">
+                <div class="week-view">
+                    <div class="week-buttons-section">
+                        <button id="todayBtn" class="week-day-btn today-nav-btn">
+                            <div class="week-day-name">TODAY</div>
+                            <div class="week-day-date">📍</div>
+                            <div class="week-day-month">GO</div>
+                        </button>
+                        <button id="lastWeekBtn" class="week-day-btn last-week-btn">
+                            <div class="week-day-name">LAST</div>
+                            <div class="week-day-date">⏮️</div>
+                            <div class="week-day-month">WEEK</div>
+                        </button>
+                        <button id="lastDayBtn" class="week-day-btn last-day-btn">
+                            <div class="week-day-name">LAST</div>
+                            <div class="week-day-date">⬅️</div>
+                            <div class="week-day-month">DAY</div>
+                        </button>
+                        <div class="week-buttons" id="weekButtons">
+                            <!-- Week buttons will be generated here -->
+                        </div>
+                        <button id="nextDayBtn" class="week-day-btn next-day-btn">
+                            <div class="week-day-name">NEXT</div>
+                            <div class="week-day-date">➡️</div>
+                            <div class="week-day-month">DAY</div>
+                        </button>
+                        <button id="nextWeekBtn" class="week-day-btn next-week-btn">
+                            <div class="week-day-name">NEXT</div>
+                            <div class="week-day-date">⏭️</div>
+                            <div class="week-day-month">WEEK</div>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="kanban-board">
+                    <div class="column-headers">
+                        <div class="column-header">To Do <span id="todoCount" class="item-count">(0)</span></div>
+                        <div class="column-header">In Progress <span id="inProgressCount" class="item-count">(0)</span></div>
+                        <div class="column-header">Done <span id="doneCount" class="item-count">(0)</span></div>
+                    </div>
+                    
+                    <div class="main-columns">
+                        <div class="column" id="todoColumn">
+                            <div class="items" id="todoItems"></div>
+                        </div>
+                        
+                        <div class="column" id="inProgressColumn">
+                            <div class="items" id="inProgressItems"></div>
+                        </div>
+                        
+                        <div class="column" id="doneColumn">
+                            <div class="items" id="doneItems"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="sectionsContainer">
+                        <!-- Sections will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="right-panel">
+                <div class="date-display-only">
+                    <div class="main-date" id="currentDate">Today</div>
+                    <div class="week-day-info" id="weekDayInfo">Monday of Week 32</div>
+                    <div class="relative-date-info">
+                        <span id="relativeDateInfo"></span>
+                    </div>
+                </div>
+                
+                <div class="inline-calendar" id="inlineCalendar">
+                    <div class="calendar-nav">
+                        <button id="prevMonth" class="nav-btn">←</button>
+                        <span id="monthYear"></span>
+                        <button id="nextMonth" class="nav-btn">→</button>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid"></div>
+                </div>
+                
+                
+                <div class="data-controls">
+                    <button id="undoBtn" class="control-btn">↶ Undo (Not for Dragging)</button>
+                    <button id="newSectionBtn" class="control-btn new-section-btn">📁 New Section</button>
+                    <button id="moveKanbanBtn" class="control-btn">➡️ Move Kanban to Next Business Day</button>
+                    <button id="deleteNewItemsBtn" class="control-btn">🗑️ Delete New Items</button>
+                    <button id="deleteDayBtn" class="control-btn">🗑️ Delete Day</button>
+                    <button id="deleteWeekBtn" class="control-btn">🗑️ Delete Week</button>
+                </div>
+            </div>
+            
+            <!-- Hidden panels for other views -->
+            <div class="left-panel hidden" id="backburnerPanel">
+                <div class="input-section">
+                    <textarea id="backburnerInput" placeholder="Enter a new backburner item..." rows="3"></textarea>
+                    <div class="due-date-section">
+                        <div class="date-priority-row">
+                            <input type="date" id="backburnerDueDateInput">
+                            <label for="backburnerDueDateInput">Due Date</label>
+                            <label class="priority-toggle">
+                                Urgent
+                                <input type="checkbox" id="backburnerHighPriorityInput">
+                            </label>
+                        </div>
+                    </div>
+                    <button id="addBackburnerBtn">Add to Backburner</button>
+                </div>
+                
+                <div class="unsorted-pane">
+                    <h3>Misc Items <span id="miscItemsCount" class="item-count">(0)</span></h3>
+                    <div class="items" id="backburnerUnsortedItems"></div>
+                    <button id="deleteMiscItemsBtn" class="control-btn" style="margin-top: 10px;">🗑️ Delete All Items</button>
+                </div>
+            </div>
+            
+            <div class="center-section-backburner hidden" id="centerSectionBackburner">
+                <div class="kanban-board">
+                    <div class="column-headers">
+                        <div class="column-header">To Do <span id="backburnerTodoCount" class="item-count">(0)</span></div>
+                        <div class="column-header">In Progress <span id="backburnerInProgressCount" class="item-count">(0)</span></div>
+                        <div class="column-header">Done <span id="backburnerDoneCount" class="item-count">(0)</span></div>
+                    </div>
+                    
+                    <div id="backburnerSectionsContainer">
+                        <!-- Backburner sections will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="left-panel hidden" id="recurringPanel">
+                <div class="recurring-form-section">
+                    <h3>Create New Recurring Task</h3>
+                    <div class="recurring-input-section">
+                        <textarea id="recurringTaskInput" placeholder="Enter recurring task description..." rows="3"></textarea>
+                        
+                        <div class="recurring-frequency-section">
+                            <label for="recurringFrequencyType">Frequency Type:</label>
+                            <select id="recurringFrequencyType">
+                                <option value="daily">Every X Days</option>
+                                <option value="weekly">Weekly on Specific Day</option>
+                                <option value="monthly">Monthly on Specific Date</option>
+                            </select>
+                        </div>
+                        
+                        <div class="frequency-details">
+                            <!-- Daily frequency -->
+                            <div id="dailyFrequency" class="frequency-option">
+                                <label for="dailyInterval">Every</label>
+                                <input type="number" id="dailyInterval" min="1" max="365" value="1">
+                                <label for="dailyInterval">day(s)</label>
+                            </div>
+                            
+                            <!-- Weekly frequency -->
+                            <div id="weeklyFrequency" class="frequency-option hidden">
+                                <label for="weeklyDay">Every</label>
+                                <select id="weeklyDay">
+                                    <option value="0">Sunday</option>
+                                    <option value="1">Monday</option>
+                                    <option value="2">Tuesday</option>
+                                    <option value="3">Wednesday</option>
+                                    <option value="4">Thursday</option>
+                                    <option value="5">Friday</option>
+                                    <option value="6">Saturday</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Monthly frequency -->
+                            <div id="monthlyFrequency" class="frequency-option hidden">
+                                <label for="monthlyDate">Day</label>
+                                <input type="number" id="monthlyDate" min="1" max="31" value="1">
+                                <label for="monthlyDate">of every month</label>
+                            </div>
+                        </div>
+                        
+                        <div class="due-date-offset-section">
+                            <label for="dueDateOffset">Due date offset:</label>
+                            <input type="number" id="dueDateOffset" min="-1" max="30" value="0">
+                            <label for="dueDateOffset"> n day(s) after occurrence   (-1 = no due date)</label>
+                        </div>
+                        
+                        <div class="date-range-section">
+                            <div class="date-range-row">
+                                <div class="date-input-group">
+                                    <label for="recurringStartDate">Start Date:</label>
+                                    <input type="date" id="recurringStartDate">
+                                </div>
+                                <div class="date-input-group">
+                                    <label for="recurringEndDate">End Date:</label>
+                                    <input type="date" id="recurringEndDate">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="priority-section">
+                            <label class="priority-toggle">
+                                High Priority
+                                <input type="checkbox" id="recurringHighPriority">
+                            </label>
+                        </div>
+                        
+                        <button id="createRecurringTaskBtn" class="recurring-btn">Create Recurring Task</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recurring Tasks Management Section -->
+            <div class="center-section-recurring hidden" id="centerSectionRecurring">
+                <div class="recurring-management">
+                    <div class="recurring-management-header">
+                        <h3>Manage Recurring Tasks</h3>
+                        <div class="recurring-header-actions">
+                            <div class="recurring-stats">
+                                <span id="recurringTasksCount" class="recurring-count">0 recurring tasks</span>
+                            </div>
+                            <button id="deleteAllRecurringBtn" class="recurring-danger-btn">🗑️ Delete All Recurring Tasks</button>
+                        </div>
+                    </div>
+                    <div class="recurring-tasks-list" id="recurringTasksList">
+                        <!-- Recurring tasks will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="left-panel hidden" id="trashPanel">
+                <div class="trash-section">
+                    <div class="trash-columns" id="trashColumns">
+                        <!-- Columns will be generated dynamically -->
+                    </div>
+                    <button id="emptyTrashBtn" class="control-btn" style="margin-top: 10px;">🗑️ Empty Trash</button>
+                </div>
+            </div>
+            
+            <div class="left-panel hidden" id="notesPanel">
+                <div class="notes-editor">
+                    <textarea id="notesTextarea" placeholder=""></textarea>
+                </div>
+            </div>
+            
+            <div class="left-panel hidden" id="sketchPanel">
+                <div class="whiteboard-toolbar">
+                    <div class="tool-group">
+                        <button id="penTool" class="tool-btn active" title="Pen">✏️</button>
+                        <button id="eraserTool" class="tool-btn" title="Eraser">🧽</button>
+                    </div>
+                    <div class="tool-group">
+                        <label>Size:</label>
+                        <input type="range" id="brushSize" min="1" max="20" value="3" class="size-slider">
+                        <span id="sizeDisplay">3px</span>
+                    </div>
+                    <div class="tool-group">
+                        <label>Color:</label>
+                        <div class="color-palette">
+                            <div class="color-btn active" data-color="#000000" style="background: #000000" title="Black"></div>
+                            <div class="color-btn" data-color="#ff0000" style="background: #ff0000" title="Red"></div>
+                            <div class="color-btn" data-color="#00ff00" style="background: #00ff00" title="Green"></div>
+                            <div class="color-btn" data-color="#0000ff" style="background: #0000ff" title="Blue"></div>
+                            <div class="color-btn" data-color="#ffff00" style="background: #ffff00" title="Yellow"></div>
+                            <div class="color-btn" data-color="#ff00ff" style="background: #ff00ff" title="Magenta"></div>
+                            <div class="color-btn" data-color="#00ffff" style="background: #00ffff" title="Cyan"></div>
+                            <div class="color-btn" data-color="#ffffff" style="background: #ffffff; border: 1px solid #ccc" title="White"></div>
+                        </div>
+                    </div>
+                    <div class="tool-group">
+                        <button id="undoSketch" class="tool-btn" title="Undo">↶</button>
+                        <button id="redoSketch" class="tool-btn" title="Redo">↷</button>
+                        <button id="clearCanvas" class="tool-btn" title="Clear All">🗑️</button>
+                    </div>
+                </div>
+                <div class="whiteboard-container">
+                    <canvas id="whiteboardCanvas"></canvas>
+                </div>
+            </div>
+            
+            <div class="wiki-panel hidden" id="wikiPanel">
+                <div class="wiki-container">
+                    <div class="wiki-header">
+                        <div class="wiki-buttons">
+                            <button id="showExampleBtn" class="wiki-control-btn">📄 Show Board with Item Examples</button>
+                            <button id="cleanBoardBtn" class="wiki-control-btn">🧹 Clean Board</button>
+                        </div>
+                    </div>
+                    <div class="wiki-content" id="wikiContent">
+                        <div class="wiki-content-inner">
+                            <p style="text-align: center; color: #7f8c8d; padding: 40px;">Loading wiki content...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="settings-panel hidden" id="settingsPanel">
+                <div class="settings-container">
+                    <div class="settings-header">
+                        <h2>Settings</h2>
+                    </div>
+                    <div class="settings-content">
+                        <!-- Top row of settings boxes -->
+                        <div class="settings-top-row">
+                            <div class="settings-section settings-box">
+                                <h3>Autosave</h3>
+                                <div class="setting-item">
+                                    <label class="setting-label">
+                                        <input type="checkbox" id="autosaveEnabled" checked>
+                                        Enable autosave to file
+                                    </label>
+                                    <p class="setting-description">Automatically saves your data to a JSON file using the File System Access API</p>
+                                </div>
+                                <div class="setting-item">
+                                    <label class="setting-label">Autosave interval</label>
+                                    <select id="autosaveInterval">
+                                        <option value="60000" selected>Every 1 minute</option>
+                                        <option value="600000">Every 10 minutes</option>
+                                        <option value="1800000">Every 30 minutes</option>
+                                        <option value="3600000">Every 1 hour</option>
+                                        <option value="7200000">Every 2 hours</option>
+                                        <option value="86400000">Every 24 hours</option>
+                                    </select>
+                                    <p class="setting-description">How often to automatically save your data</p>
+                                </div>
+                                <div class="setting-item">
+                                    <button id="selectAutosaveFileBtn" class="settings-btn">📁 Select Autosave File Location</button>
+                                    <p class="setting-description">Choose where to save your backups</p>
+                                </div>
+                                <div class="setting-item">
+                                    <button id="saveNowBtn" class="settings-btn">💾 Save Now</button>
+                                    <p class="setting-description">Manually trigger an autosave to your selected file</p>
+                                </div>
+                                <div class="setting-item">
+                                    <span id="autosaveStatus" class="setting-description">Autosave status: Not configured</span>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-section settings-box">
+                                <h3>General Settings</h3>
+                                <div class="setting-item">
+                                    <label class="setting-label">Skip the following days when selecting next day on Friday</label>
+                                    <select id="skipDaysSelection">
+                                        <option value="none">None (move to next calendar day)</option>
+                                        <option value="sunday">Skip Sunday only</option>
+                                        <option value="both" selected>Skip Saturday and Sunday</option>
+                                    </select>
+                                    <p class="setting-description">Controls which days to skip when moving an item forward on Friday: None goes to Saturday and Sunday, Sunday only goes to Saturday then Monday, Both goes directly to Monday</p>
+                                </div>
+                                <div class="setting-item">
+                                    <label class="setting-label">Automatically set due date for new items from today</label>
+                                    <select id="defaultDueDateSetting">
+                                        <option value="none">No due date (current behavior)</option>
+                                        <option value="1">In 1 day</option>
+                                        <option value="2">In 2 days</option>
+                                        <option value="3">In 3 days</option>
+                                        <option value="4">In 4 days</option>
+                                        <option value="5">In 5 days</option>
+                                        <option value="6">In 6 days</option>
+                                        <option value="7">In 1 week</option>
+                                        <option value="14">In 2 weeks</option>
+                                        <option value="21">In 3 weeks</option>
+                                        <option value="28">In 4 weeks</option>
+                                        <option value="35">In 5 weeks</option>
+                                        <option value="42">In 6 weeks</option>
+                                        <option value="49">In 7 weeks</option>
+                                        <option value="56">In 8 weeks</option>
+                                        <option value="63">In 9 weeks</option>
+                                        <option value="70">In 10 weeks</option>
+                                        <option value="77">In 11 weeks</option>
+                                        <option value="84">In 12 weeks</option>
+                                    </select>
+                                    <p class="setting-description">New todo and backburner items will automatically have this due date set. You can always change it manually after creation.</p>
+                                </div>
+                                <div class="setting-item">
+                                    <label class="setting-label">Show feedback messages</label>
+                                    <select id="feedbackLevel">
+                                        <option value="all">All messages</option>
+                                        <option value="important">Important only</option>
+                                        <option value="none">None</option>
+                                    </select>
+                                    <p class="setting-description">Control when success/error messages are displayed</p>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-section settings-box">
+                                <h3>Statistics</h3>
+                                <div class="stats-grid">
+                                    <div class="stat-item">
+                                        <span class="stat-number" id="statsTotalItems">0</span>
+                                        <span class="stat-label">Total Items</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-number" id="statsTotalSections">0</span>
+                                        <span class="stat-label">Total Sections</span>
+                                    </div>
+                                    <div class="stat-item stat-new-items">
+                                        <span class="stat-number" id="statsNewItems">0</span>
+                                        <span class="stat-label">New Items</span>
+                                    </div>
+                                    <div class="stat-item stat-misc-items">
+                                        <span class="stat-number" id="statsMiscItems">0</span>
+                                        <span class="stat-label">Backburner Items</span>
+                                    </div>
+                                    <div class="stat-item stat-todo-items">
+                                        <span class="stat-number" id="statsTodoItems">0</span>
+                                        <span class="stat-label">Todo Items</span>
+                                    </div>
+                                    <div class="stat-item stat-in-progress-items">
+                                        <span class="stat-number" id="statsInProgressItems">0</span>
+                                        <span class="stat-label">In Progress</span>
+                                    </div>
+                                    <div class="stat-item stat-done-items">
+                                        <span class="stat-number" id="statsDoneItems">0</span>
+                                        <span class="stat-label">Done Items</span>
+                                    </div>
+                                    <div class="stat-item stat-trash-items">
+                                        <span class="stat-number" id="statsTrashItems">0</span>
+                                        <span class="stat-label">Trash Items</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-section settings-box">
+                                <h3>Data Management</h3>
+                                <div class="data-management-columns">
+                                    <div class="data-management-left">
+                                        <div class="setting-item">
+                                            <button id="exportAllDataBtn" class="settings-btn">📤 Export Data</button>
+                                            <p class="setting-description">Download a structured backup of all your todos, notes, and settings</p>
+                                        </div>
+                                        <div class="setting-item">
+                                            <label for="importFileSettings" class="settings-btn">📥 Import JSON</label>
+                                            <input type="file" id="importFileSettings" accept=".json" style="display: none;">
+                                            <p class="setting-description">Import todos and data from a JSON backup file</p>
+                                        </div>
+                                        <div class="setting-item">
+                                            <label for="importCsvFileSettings" class="settings-btn">📊 Import CSV</label>
+                                            <input type="file" id="importCsvFileSettings" accept=".csv,.txt" style="display: none;">
+                                            <p class="setting-description">Import todos from a CSV or text file</p>
+                                        </div>
+                                        <div class="setting-item">
+                                            <button id="showExampleBtnSettings" class="settings-btn">📄 Show Board with Item Examples</button>
+                                            <p class="setting-description">Load example data to demonstrate all app features</p>
+                                        </div>
+                                    </div>
+                                    <div class="data-management-right">
+                                        <div class="setting-item">
+                                            <button id="deleteAllBtnSettings" class="settings-btn danger-btn">🗑️ Delete All Items Everywhere</button>
+                                            <p class="setting-description">Delete all todos from all dates (can be undone)</p>
+                                        </div>
+                                        <div class="setting-item">
+                                            <button id="clearVisibleBoardsBtnSettings" class="settings-btn danger-btn">🧹 Clear All Panels</button>
+                                            <p class="setting-description">Clear all visible boards, panels, notes, and sketches</p>
+                                        </div>
+                                        <div class="setting-item">
+                                            <button id="clearAllDataBtn" class="settings-btn danger-btn">🗑️ Clear All Data</button>
+                                            <p class="setting-description">⚠️ This will permanently reset the browser tab and delete EVERYTHING</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section changelog-section">
+                            <h3>Changelog & About</h3>
+                            <div class="changelog-content">
+                                <div class="changelog-display" id="changelogDisplay">
+                                    <!-- Content will be loaded from changelogContent.js -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    
+    <script src="wikiContent.js"></script>
+    <script src="markdownParser.js"></script>
+    <script src="notesContent.js"></script>
+    <script src="changelogContent.js"></script>
+    <script src="exampleData.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

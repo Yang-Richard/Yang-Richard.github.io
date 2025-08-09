@@ -4,10 +4,10 @@ window.ChangelogContent = {
         return `
             <br>
             <div class="changelog-entries">
-                <p><strong>v3.0 - 2025-08-08</strong></p>
+                <p><strong>v3.2 - 2025-08-09</strong></p>
                 <ul>
-                    <li>Ready for use!</li>
                     <li>Added auto saving feature on Chrome, Brave, Edge</li>
+                    <li>Added text box to each day </li>
                     <li>Lots of bug fixes </li>
                 </ul>
                 <br>

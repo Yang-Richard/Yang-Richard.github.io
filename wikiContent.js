@@ -39,6 +39,8 @@ Your main productivity hub where you manage daily tasks. The panel includes a "N
 
 You can create custom sections to organize by project or category, and the calendar integration lets you navigate between dates easily. Items have priority markers and due date color coding (red for overdue/today, yellow for tomorrow). The undo system helps fix mistakes, though it doesn't work for drag operations.
 
+Each day also includes a dedicated Daily Notes section in the bottom right corner where you can add quick notes, thoughts, or reminders specific to that date. These notes persist with each day and are included in exports and autosaves.
+
 ### 🔥 BACKBURNER Panel - Long-Term Storage
 
 The Backburner panel is perfect for capturing ideas, someday tasks, and non-urgent items that you want to keep track of but don't need to work on immediately. It includes a "Misc Items" section for general backburner storage where you can quickly capture thoughts and ideas as they come to you.

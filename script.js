@@ -10,6 +10,8 @@ class DailyTodoApp {
         this.doneItems = document.getElementById('doneItems');
         this.unsortedItems = document.getElementById('unsortedItems');
         
+        this.dailyNotesTextarea = document.getElementById('dailyNotesTextarea');
+        
         this.currentDateElement = document.getElementById('currentDate');
         this.inlineCalendar = document.getElementById('inlineCalendar');
         this.monthYearElement = document.getElementById('monthYear');
@@ -169,6 +171,11 @@ class DailyTodoApp {
         this.autoResizeTextarea(this.todoInput);
         this.autoResizeTextarea(this.backburnerInput);
         this.autoResizeTextarea(this.recurringTaskInput);
+        
+        // Daily notes event listener
+        this.dailyNotesTextarea.addEventListener('input', () => {
+            this.saveDailyNotes();
+        });
         
         // Initialize recurring tasks interface
         this.updateFrequencyOptions();
@@ -781,8 +788,8 @@ class DailyTodoApp {
         
         // Example 1: Daily standup meeting
         const dailyStandup = {
-            id: -2,
-            text: "Reoccuring - Daily standup meeting",
+            id: "Recurring Example 1",
+            text: "Daily standup meeting",
             frequency: {
                 type: 'daily',
                 interval: 1
@@ -796,8 +803,8 @@ class DailyTodoApp {
         
         // Example 2: Weekly team retrospective (Fridays)
         const weeklyRetrospective = {
-            id: -1,
-            text: "Reoccuring - Weekly team retrospective",
+            id: "Recurring Example 2",
+            text: "Weekly team retrospective",
             frequency: {
                 type: 'weekly',
                 dayOfWeek: 5 // Friday
@@ -1084,6 +1091,26 @@ class DailyTodoApp {
     
     getDateKey() {
         return this.currentDate.toISOString().split('T')[0];
+    }
+    
+    saveDailyNotes() {
+        const dateKey = this.getDateKey();
+        const notesContent = this.dailyNotesTextarea.value;
+        const storageKey = `dailyNotes_${dateKey}`;
+        
+        if (notesContent.trim() === '') {
+            localStorage.removeItem(storageKey);
+        } else {
+            localStorage.setItem(storageKey, notesContent);
+        }
+    }
+    
+    loadDailyNotes() {
+        const dateKey = this.getDateKey();
+        const storageKey = `dailyNotes_${dateKey}`;
+        const savedNotes = localStorage.getItem(storageKey);
+        
+        this.dailyNotesTextarea.value = savedNotes || '';
     }
     
     saveTodosForDate() {
@@ -1443,6 +1470,9 @@ class DailyTodoApp {
         // Update due date styling for all loaded items
         this.updateAllItemsDueDateStyling();
         this.updateAllItemCounts();
+        
+        // Load daily notes for this date
+        this.loadDailyNotes();
     }
     
     loadGlobalUnsortedItems() {
@@ -2251,10 +2281,14 @@ class DailyTodoApp {
         try {
             console.log('Export started...');
             const allData = {};
+            const dailyNotes = {};
             
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key.startsWith('dailyTodos_')) {
+                if (key.startsWith('dailyTodos_') && 
+                    key !== 'dailyTodos_notes' && 
+                    key !== 'dailyTodos_whiteboard' && 
+                    key !== 'dailyTodos_trash') {
                     const date = key.replace('dailyTodos_', '');
                     const data = localStorage.getItem(key);
                     if (data && data.trim()) {
@@ -2264,6 +2298,12 @@ class DailyTodoApp {
                             console.warn(`Failed to parse data for ${key}:`, e);
                             allData[date] = null;
                         }
+                    }
+                } else if (key.startsWith('dailyNotes_')) {
+                    const date = key.replace('dailyNotes_', '');
+                    const noteContent = localStorage.getItem(key);
+                    if (noteContent && noteContent.trim()) {
+                        dailyNotes[date] = noteContent;
                     }
                 }
             }
@@ -2280,6 +2320,7 @@ class DailyTodoApp {
                 exportDate: new Date().toISOString(),
                 version: '1.5',
                 data: allData,
+                dailyNotes: dailyNotes,
                 globalUnsortedItems: globalUnsorted ? JSON.parse(globalUnsorted) : [],
                 backburnerItems: backburnerItems ? JSON.parse(backburnerItems) : { unsortedItems: [], sections: {} },
                 trashItems: trashItems ? JSON.parse(trashItems) : [],
@@ -2345,12 +2386,15 @@ class DailyTodoApp {
         const importedData = {
             data: rawData.data || {},
             exportDate: rawData.exportDate || new Date().toISOString(),
+            dailyNotes: rawData.dailyNotes || {},
             globalUnsortedItems: rawData.globalUnsortedItems || [],
             backburnerItems: rawData.backburnerItems || { unsortedItems: [], sections: {} },
             trashItems: rawData.trashItems || [],
             notes: rawData.notes !== undefined ? rawData.notes : '',
-            whiteboard: rawData.whiteboard !== undefined ? rawData.whiteboard : ''
+            whiteboard: rawData.whiteboard !== undefined ? rawData.whiteboard : '',
+            recurringTasks: rawData.recurringTasks || []
         };
+        
         
         // Normalize each date's todos data
         Object.entries(importedData.data).forEach(([date, todos]) => {
@@ -2522,6 +2566,13 @@ class DailyTodoApp {
                     // Import recurring tasks if they exist
                     if (importedData.recurringTasks) {
                         localStorage.setItem('recurringTasks', JSON.stringify(importedData.recurringTasks));
+                    }
+                    
+                    // Import daily notes if they exist
+                    if (importedData.dailyNotes) {
+                        Object.entries(importedData.dailyNotes).forEach(([date, noteContent]) => {
+                            localStorage.setItem(`dailyNotes_${date}`, noteContent);
+                        });
                     }
                     
                     this.loadTodosForDate();
@@ -6939,6 +6990,7 @@ class DailyTodoApp {
     
     prepareExportData() {
         const allData = {};
+        const dailyNotes = {};
         
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -6956,6 +7008,12 @@ class DailyTodoApp {
                         allData[date] = null;
                     }
                 }
+            } else if (key.startsWith('dailyNotes_')) {
+                const date = key.replace('dailyNotes_', '');
+                const noteContent = localStorage.getItem(key);
+                if (noteContent && noteContent.trim()) {
+                    dailyNotes[date] = noteContent;
+                }
             }
         }
         
@@ -6972,6 +7030,7 @@ class DailyTodoApp {
             version: '1.5',
             autosave: true,
             data: allData,
+            dailyNotes: dailyNotes,
             globalUnsortedItems: globalUnsorted ? JSON.parse(globalUnsorted) : [],
             backburnerItems: backburnerItems ? JSON.parse(backburnerItems) : { unsortedItems: [], sections: {} },
             trashItems: trashItems ? JSON.parse(trashItems) : [],

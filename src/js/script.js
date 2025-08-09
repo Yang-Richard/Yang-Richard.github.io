@@ -20,17 +20,10 @@ class DailyTodoApp {
         this.nextMonthBtn = document.getElementById('nextMonth');
         this.undoBtn = document.getElementById('undoBtn');
         this.newSectionBtn = document.getElementById('newSectionBtn');
-        // These elements were moved to settings panel
-        // this.exportBtn = document.getElementById('exportBtn');
-        // this.importFile = document.getElementById('importFile');
-        // this.importCsvFile = document.getElementById('importCsvFile');
         this.moveKanbanBtn = document.getElementById('moveKanbanBtn');
         this.deleteNewItemsBtn = document.getElementById('deleteNewItemsBtn');
         this.deleteDayBtn = document.getElementById('deleteDayBtn');
         this.deleteWeekBtn = document.getElementById('deleteWeekBtn');
-        // These elements were moved to settings panel
-        // this.deleteAllBtn = document.getElementById('deleteAllBtn');
-        // this.clearStorageBtn = document.getElementById('clearStorageBtn');
         this.weekButtons = document.getElementById('weekButtons');
         this.relativeDateInfoElement = document.getElementById('relativeDateInfo');
         this.todayBtn = document.getElementById('todayBtn');
@@ -55,8 +48,19 @@ class DailyTodoApp {
         this.searchNavBtn = document.getElementById('searchNavBtn');
         this.showExampleBtn = document.getElementById('showExampleBtn');
         this.cleanBoardBtn = document.getElementById('cleanBoardBtn');
-        // This element was moved to settings panel
-        // this.clearVisibleBoardsBtn = document.getElementById('clearVisibleBoardsBtn');
+        
+        // Pomodoro elements
+        this.pomodoroTimer = document.getElementById('pomodoroTimer');
+        this.pomodoroStatus = document.getElementById('pomodoroStatus');
+        this.pomodoroSession = document.getElementById('pomodoroSession');
+        this.pomodoroStart = document.getElementById('pomodoroStart');
+        this.pomodoroPause = document.getElementById('pomodoroPause');
+        this.pomodoroStop = document.getElementById('pomodoroStop');
+        this.pomodoroSkip = document.getElementById('pomodoroSkip');
+        this.pomodoroWorkDuration = document.getElementById('pomodoroWorkDuration');
+        this.pomodoroBreakDuration = document.getElementById('pomodoroBreakDuration');
+        this.pomodoroLongBreakDuration = document.getElementById('pomodoroLongBreakDuration');
+        this.pomodoroNotifications = document.getElementById('pomodoroNotifications');
         
         // Panel elements
         this.todoPanel = document.getElementById('todoPanel');
@@ -132,6 +136,15 @@ class DailyTodoApp {
         // Flag to prevent duplicate event listener setup
         this.settingsEventListenersAdded = false;
         
+        // Pomodoro timer state
+        this.pomodoroInterval = null;
+        this.pomodoroTimeRemaining = 25 * 60; // 25 minutes in seconds
+        this.pomodoroCurrentSession = 1;
+        this.pomodoroTotalSessions = 4;
+        this.pomodoroMode = 'work'; // 'work', 'break', 'long-break'
+        this.pomodoroIsRunning = false;
+        this.pomodoroIsPaused = false;
+        
         this.init();
     }
     
@@ -201,15 +214,12 @@ class DailyTodoApp {
             nextMonthBtn: () => this.changeMonth(1),
             undoBtn: () => this.performUndo(),
             newSectionBtn: () => this.createNewSection(),
-            // exportBtn: () => this.exportData(), // Moved to settings
             moveKanbanBtn: () => this.moveKanbanToNextDay(),
             deleteNewItemsBtn: () => this.deleteNewItems(),
             emptyTrashBtn: () => this.emptyTrash(),
             deleteMiscItemsBtn: () => this.deleteMiscItems(),
             deleteDayBtn: () => this.deleteCurrentDay(),
             deleteWeekBtn: () => this.deleteCurrentWeek(),
-            // deleteAllBtn: () => this.deleteAllData(), // Moved to settings
-            // clearStorageBtn: () => this.clearAllStorage() // Moved to settings
         };
         
         Object.entries(clickHandlers).forEach(([elementName, handler]) => {
@@ -217,10 +227,6 @@ class DailyTodoApp {
                 this[elementName].addEventListener('click', handler);
             }
         });
-        
-        // Import file listeners moved to settings panel
-        // this.importFile.addEventListener('change', (e) => this.importData(e));
-        // this.importCsvFile.addEventListener('change', (e) => this.importCsvData(e));
         
         // Navigation buttons
         this.todoNavBtn.addEventListener('click', () => this.switchPanel('todo'));
@@ -234,8 +240,16 @@ class DailyTodoApp {
         this.searchNavBtn.addEventListener('click', () => this.switchPanel('search'));
         this.showExampleBtn.addEventListener('click', () => this.showExample());
         this.cleanBoardBtn.addEventListener('click', () => this.clearVisibleBoards());
-        // Clear visible boards listener moved to settings panel
-        // this.clearVisibleBoardsBtn.addEventListener('click', () => this.clearVisibleBoards());
+        
+        // Pomodoro functionality
+        this.pomodoroStart.addEventListener('click', () => this.startPomodoro());
+        this.pomodoroPause.addEventListener('click', () => this.pausePomodoro());
+        this.pomodoroStop.addEventListener('click', () => this.stopPomodoro());
+        this.pomodoroSkip.addEventListener('click', () => this.skipPomodoro());
+        this.pomodoroWorkDuration.addEventListener('change', () => this.updatePomodoroSettings());
+        this.pomodoroBreakDuration.addEventListener('change', () => this.updatePomodoroSettings());
+        this.pomodoroLongBreakDuration.addEventListener('change', () => this.updatePomodoroSettings());
+        this.pomodoroNotifications.addEventListener('change', () => this.savePomodoroSettings());
         
         // Notes functionality
         this.notesTextarea.addEventListener('input', () => this.saveNotes());
@@ -268,6 +282,190 @@ class DailyTodoApp {
         
         // Show initial panel (wiki on first visit, last selected panel on subsequent visits)
         this.showInitialPanel();
+        
+        // Initialize keyboard shortcuts
+        this.initKeyboardShortcuts();
+        
+        // Initialize Pomodoro timer
+        this.initPomodoro();
+    }
+    
+    initKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Don't trigger shortcuts when typing in inputs or textareas
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+                return;
+            }
+            
+            // Panel navigation shortcuts (Ctrl/Cmd + Number)
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                switch(e.key) {
+                    case '1':
+                        e.preventDefault();
+                        this.switchPanel('todo');
+                        this.showFeedback('Switched to TODO panel', 'success');
+                        break;
+                    case '2':
+                        e.preventDefault();
+                        this.switchPanel('backburner');
+                        this.showFeedback('Switched to LATER panel', 'success');
+                        break;
+                    case '3':
+                        e.preventDefault();
+                        this.switchPanel('recurring');
+                        this.showFeedback('Switched to RECURRING panel', 'success');
+                        break;
+                    case '4':
+                        e.preventDefault();
+                        this.switchPanel('search');
+                        this.showFeedback('Switched to SEARCH panel', 'success');
+                        break;
+                    case '5':
+                        e.preventDefault();
+                        this.switchPanel('trash');
+                        this.showFeedback('Switched to TRASH panel', 'success');
+                        break;
+                    case '6':
+                        e.preventDefault();
+                        this.switchPanel('notes');
+                        this.showFeedback('Switched to NOTES panel', 'success');
+                        break;
+                    case '7':
+                        e.preventDefault();
+                        this.switchPanel('sketch');
+                        this.showFeedback('Switched to SKETCH panel', 'success');
+                        break;
+                    case '8':
+                        e.preventDefault();
+                        this.switchPanel('settings');
+                        this.showFeedback('Switched to SETTINGS panel', 'success');
+                        break;
+                    case '9':
+                        e.preventDefault();
+                        this.switchPanel('wiki');
+                        this.showFeedback('Switched to WIKI panel', 'success');
+                        break;
+                }
+            }
+            
+            // Navigation shortcuts (no modifier keys)
+            if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                switch(e.key) {
+                    case 'h':
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        this.changeDay(-1);
+                        this.showFeedback('Previous day', 'success');
+                        break;
+                    case 'l':
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        this.changeDay(1);
+                        this.showFeedback('Next day', 'success');
+                        break;
+                    case 'j':
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        this.goToNextWeek();
+                        this.showFeedback('Next week', 'success');
+                        break;
+                    case 'k':
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        this.goToLastWeek();
+                        this.showFeedback('Previous week', 'success');
+                        break;
+                    case 't':
+                        e.preventDefault();
+                        this.goToToday();
+                        this.showFeedback('Today', 'success');
+                        break;
+                    case 'u':
+                        e.preventDefault();
+                        if (this.undoBtn && !this.undoBtn.disabled) {
+                            this.undo();
+                            this.showFeedback('Undo', 'success');
+                        }
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        this.newSection();
+                        this.showFeedback('New section created', 'success');
+                        break;
+                    case 'n':
+                        e.preventDefault();
+                        this.moveKanbanToNextDay();
+                        this.showFeedback('Moved items to next day', 'success');
+                        break;
+                    case 'a':
+                        e.preventDefault();
+                        // Focus on the input field for adding todos
+                        if (!this.todoPanel.classList.contains('hidden')) {
+                            this.todoInput.focus();
+                            this.showFeedback('Ready to add TODO item', 'success');
+                        } else if (!this.backburnerPanel.classList.contains('hidden')) {
+                            this.backburnerInput.focus();
+                            this.showFeedback('Ready to add LATER item', 'success');
+                        } else if (!this.recurringPanel.classList.contains('hidden')) {
+                            this.recurringTaskInput.focus();
+                            this.showFeedback('Ready to add RECURRING item', 'success');
+                        } else if (!this.searchPanel.classList.contains('hidden')) {
+                            this.searchInput.focus();
+                            this.showFeedback('Ready to search', 'success');
+                        }
+                        break;
+                    case 'p':
+                        e.preventDefault();
+                        if (this.pomodoroIsRunning) {
+                            this.pausePomodoro();
+                        } else {
+                            this.startPomodoro();
+                        }
+                        break;
+                    case '?':
+                        e.preventDefault();
+                        this.showKeyboardShortcutsHelp();
+                        break;
+                }
+            }
+        });
+    }
+    
+    showKeyboardShortcutsHelp() {
+        const shortcuts = [
+            'Keyboard Shortcuts:',
+            '',
+            'Panel Navigation:',
+            '  Ctrl/Cmd + 1-9: Switch between panels',
+            '  Ctrl/Cmd + 1: TODO panel',
+            '  Ctrl/Cmd + 2: LATER panel', 
+            '  Ctrl/Cmd + 3: RECURRING panel',
+            '  Ctrl/Cmd + 4: SEARCH panel',
+            '  Ctrl/Cmd + 5: TRASH panel',
+            '  Ctrl/Cmd + 6: NOTES panel',
+            '  Ctrl/Cmd + 7: SKETCH panel',
+            '  Ctrl/Cmd + 8: SETTINGS panel',
+            '  Ctrl/Cmd + 9: WIKI panel',
+            '',
+            'Date Navigation:',
+            '  h/←: Previous day',
+            '  l/→: Next day', 
+            '  j/↓: Next week',
+            '  k/↑: Previous week',
+            '  t: Go to today',
+            '',
+            'Actions:',
+            '  a: Focus input field (add item)',
+            '  u: Undo last action',
+            '  s: Create new section',
+            '  n: Move items to next day',
+            '  p: Start/pause Pomodoro timer',
+            '  ?: Show this help',
+            '',
+            'Note: Shortcuts work when not typing in input fields'
+        ].join('\n');
+        
+        alert(shortcuts);
     }
     
     showInitialPanel() {
@@ -513,16 +711,49 @@ class DailyTodoApp {
         // Add event listeners only once
         if (!this.settingsEventListenersAdded) {
             // Add event listeners for settings changes
-            document.getElementById('autosaveEnabled').addEventListener('change', (e) => {
+            document.getElementById('autosaveEnabled').addEventListener('change', async (e) => {
                 const isEnabled = e.target.checked;
-                localStorage.setItem('autosaveEnabled', isEnabled);
-                this.autosaveEnabled = isEnabled;
                 
-                // Always restart the interval to ensure proper state
-                this.restartAutosaveInterval();
-                
-                // Update the status display
-                this.updateAutosaveStatus();
+                if (isEnabled) {
+                    // Check if we have a file selected
+                    const hasFileHandle = this.autosaveFileHandle || await this.getStoredFileHandle();
+                    
+                    if (!hasFileHandle) {
+                        // Prompt user to select a file first
+                        if (confirm('Autosave requires selecting a file location. Would you like to choose one now?')) {
+                            try {
+                                await this.selectAutosaveFile();
+                                // File was selected successfully, proceed with enabling
+                                localStorage.setItem('autosaveEnabled', isEnabled);
+                                this.autosaveEnabled = isEnabled;
+                                this.restartAutosaveInterval();
+                                this.updateAutosaveStatus();
+                            } catch (error) {
+                                // User cancelled file selection, uncheck the checkbox
+                                e.target.checked = false;
+                                this.showFeedback('Autosave not enabled - no file selected', 'error');
+                                return;
+                            }
+                        } else {
+                            // User declined to select a file, uncheck the checkbox
+                            e.target.checked = false;
+                            this.showFeedback('Autosave not enabled - no file selected', 'error');
+                            return;
+                        }
+                    } else {
+                        // File is available, proceed normally
+                        localStorage.setItem('autosaveEnabled', isEnabled);
+                        this.autosaveEnabled = isEnabled;
+                        this.restartAutosaveInterval();
+                        this.updateAutosaveStatus();
+                    }
+                } else {
+                    // Disabling autosave, proceed normally
+                    localStorage.setItem('autosaveEnabled', isEnabled);
+                    this.autosaveEnabled = isEnabled;
+                    this.restartAutosaveInterval();
+                    this.updateAutosaveStatus();
+                }
             });
             
             document.getElementById('autosaveInterval').addEventListener('change', (e) => {
@@ -734,7 +965,6 @@ class DailyTodoApp {
             this.notesTextarea.value = window.NotesContent.getDefaultContent();
         }
 
-        // Set placeholder text from external file
         this.notesTextarea.placeholder = window.NotesContent.getPlaceholderText();
     }
     
@@ -807,10 +1037,10 @@ class DailyTodoApp {
         // Example 1: Daily standup meeting
         const dailyStandup = {
             id: "Recurring Example 1",
-            text: "Daily standup meeting",
+            text: "10 day standup sync",
             frequency: {
                 type: 'daily',
-                interval: 1
+                interval: 10
             },
             dueDateOffset: 0,
             startDate: '2025-08-08',
@@ -1293,8 +1523,6 @@ class DailyTodoApp {
         };
         localStorage.setItem(`dailyTodos_${dateKey}`, JSON.stringify(todos));
         
-        // Disable autodebugexport in console for now
-        //this.autoDebugExport();
     }
     
     saveGlobalUnsortedItems() {
@@ -1524,6 +1752,7 @@ class DailyTodoApp {
         this.renderWeekView();
         this.loadTodosForDate();
         this.syncCalendarToCurrentDate();
+        this.updateCalendarColors();
         this.updateDefaultDueDateInputs();
     }
     
@@ -1668,6 +1897,7 @@ class DailyTodoApp {
                 this.renderWeekView();
                 this.loadTodosForDate();
                 this.syncCalendarToCurrentDate();
+                this.updateCalendarColors();
                 this.updateDefaultDueDateInputs();
             });
             
@@ -2366,10 +2596,6 @@ class DailyTodoApp {
             
             console.log('Export download triggered');
             this.showFeedback('Data exported successfully!');
-            
-            //disable debugexporttofolder
-            //this.debugExportToFolder(jsonString);
-
         } catch (error) {
             console.error('Export failed:', error);
             this.showFeedback('Export failed: ' + error.message, 'error');
@@ -3278,7 +3504,7 @@ class DailyTodoApp {
         const allKeys = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key.startsWith('dailyTodos_')) {
+            if (key.startsWith('dailyTodos_') && key !== 'dailyTodos_notes' && key !== 'dailyTodos_whiteboard') {
                 allKeys.push(key);
             }
         }
@@ -3288,24 +3514,22 @@ class DailyTodoApp {
             return;
         }
         
-        if (confirm(`⚠️ DELETE ALL TODO DATA?\n\nThis will permanently delete ALL your todos from ALL days (${allKeys.length} days total).\n\nThis action cannot be undone and will clear your entire todo history.`)) {
-            if (confirm(`🚨 FINAL CONFIRMATION\n\nYou are about to delete ${allKeys.length} days of todo data.\n\nTHIS WILL DELETE EVERYTHING!\n\n`)) {
+        if (confirm(`⚠️ DELETE ALL TODO DATA?\n\nThis will permanently delete ALL your todos from ALL days (${allKeys.length} days total).\n\nThis action cannot be undone and will clear your entire todo history.\n\nNotes and sketches will remain intact.`)) {
+            if (confirm(`🚨 FINAL CONFIRMATION\n\nYou are about to delete ${allKeys.length} days of todo data.\n\nTHIS WILL DELETE ALL TODO ITEMS!\n\nNotes and sketches will be preserved.`)) {
                 allKeys.forEach(key => localStorage.removeItem(key));
                 // Also delete global data
                 localStorage.removeItem('globalUnsortedItems');
                 localStorage.removeItem('dailyTodos_trash');
                 localStorage.removeItem('recurringTasks');
                 localStorage.removeItem('backburnerItems');
-                localStorage.removeItem('dailyTodos_notes');
-                localStorage.removeItem('dailyTodos_whiteboard');
+                // Note: NOT deleting notes and whiteboard - those stay intact
                 this.loadTodosForDate();
                 this.loadTrashItems();
                 this.loadRecurringTasks();
                 this.loadBackburnerItems();
-                this.loadNotes();
-                this.loadWhiteboard();
+                // Note: NOT reloading notes and whiteboard since we didn't delete them
                 this.updateStatistics();
-                this.showFeedback(`Deleted all todo data (${allKeys.length} days + all items everywhere)`);
+                this.showFeedback(`Deleted all todo data (${allKeys.length} days + all todo items). Notes and sketches preserved.`);
             }
         }
     }
@@ -4176,6 +4400,7 @@ class DailyTodoApp {
             this.updateInfoSection();
             this.renderWeekView();
             this.syncCalendarToCurrentDate();
+            this.updateCalendarColors();
             
             // Clear current items and reload for the date (this will include our restored item)
             this.clearAllItems();
@@ -5285,6 +5510,7 @@ class DailyTodoApp {
             });
             
             this.saveTodosForDate();
+            this.updateCalendarColors();
             this.showFeedback(`Moved ${itemCount} items to ${nextDateStr}`);
         }
     }
@@ -5741,6 +5967,7 @@ class DailyTodoApp {
             // Reload the UI
             this.loadTodosForDate();
             this.loadTrashItems();
+            this.updateCalendarColors();
             
             this.showFeedback(`Undid: ${lastState.description}`);
         } else {
@@ -6186,7 +6413,6 @@ class DailyTodoApp {
         
         const defaultDueDate = this.getDefaultDueDate();
         
-        // Debug logging
         console.log('Updating default due date inputs:', {
             setting,
             currentDate: this.currentDate.toISOString().split('T')[0],
@@ -6862,7 +7088,6 @@ class DailyTodoApp {
     }
     
     async createDefaultAutosaveFile() {
-        // This function is no longer used - we don't auto-prompt for file selection
         console.log('createDefaultAutosaveFile called but no longer used');
     }
     
@@ -7470,6 +7695,251 @@ class DailyTodoApp {
     clearSearchResults() {
         this.searchResultsCount.textContent = 'Enter text to search...';
         this.searchResults.innerHTML = '';
+    }
+    
+    // Pomodoro Timer Methods
+    initPomodoro() {
+        this.loadPomodoroSettings();
+        this.updatePomodoroDisplay();
+        this.updatePomodoroSession();
+        
+        // Request notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }
+    
+    loadPomodoroSettings() {
+        const savedSettings = localStorage.getItem('pomodoroSettings');
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            this.pomodoroWorkDuration.value = settings.workDuration || 25;
+            this.pomodoroBreakDuration.value = settings.breakDuration || 5;
+            this.pomodoroLongBreakDuration.value = settings.longBreakDuration || 15;
+            this.pomodoroNotifications.checked = settings.notifications !== false;
+        }
+    }
+    
+    savePomodoroSettings() {
+        const settings = {
+            workDuration: parseInt(this.pomodoroWorkDuration.value),
+            breakDuration: parseInt(this.pomodoroBreakDuration.value),
+            longBreakDuration: parseInt(this.pomodoroLongBreakDuration.value),
+            notifications: this.pomodoroNotifications.checked
+        };
+        localStorage.setItem('pomodoroSettings', JSON.stringify(settings));
+    }
+    
+    updatePomodoroSettings() {
+        if (!this.pomodoroIsRunning) {
+            if (this.pomodoroMode === 'work') {
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroWorkDuration.value) * 60;
+            } else if (this.pomodoroMode === 'break') {
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroBreakDuration.value) * 60;
+            } else if (this.pomodoroMode === 'long-break') {
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroLongBreakDuration.value) * 60;
+            }
+            this.updatePomodoroDisplay();
+        }
+        this.savePomodoroSettings();
+    }
+    
+    startPomodoro() {
+        this.pomodoroIsRunning = true;
+        this.pomodoroIsPaused = false;
+        
+        this.pomodoroStart.disabled = true;
+        this.pomodoroPause.disabled = false;
+        this.pomodoroStop.disabled = false;
+        this.pomodoroSkip.disabled = false;
+        
+        this.pomodoroTimer.classList.add('pomodoro-active');
+        this.updatePomodoroStatus();
+        
+        this.pomodoroInterval = setInterval(() => {
+            this.pomodoroTimeRemaining--;
+            this.updatePomodoroDisplay();
+            
+            if (this.pomodoroTimeRemaining <= 0) {
+                this.pomodoroSessionComplete();
+            }
+        }, 1000);
+        
+        this.showFeedback(`${this.pomodoroMode === 'work' ? 'Work' : 'Break'} session started!`, 'success');
+    }
+    
+    pausePomodoro() {
+        if (this.pomodoroIsRunning) {
+            clearInterval(this.pomodoroInterval);
+            this.pomodoroIsRunning = false;
+            this.pomodoroIsPaused = true;
+            
+            this.pomodoroStart.disabled = false;
+            this.pomodoroPause.disabled = true;
+            this.pomodoroTimer.classList.remove('pomodoro-active');
+            
+            this.pomodoroStatus.textContent = 'Paused';
+            this.showFeedback('Timer paused', 'success');
+        }
+    }
+    
+    stopPomodoro() {
+        this.resetPomodoro();
+        this.showFeedback('Timer stopped', 'success');
+    }
+    
+    skipPomodoro() {
+        clearInterval(this.pomodoroInterval);
+        this.pomodoroSessionComplete();
+        this.showFeedback('Session skipped', 'success');
+    }
+    
+    resetPomodoro() {
+        clearInterval(this.pomodoroInterval);
+        this.pomodoroIsRunning = false;
+        this.pomodoroIsPaused = false;
+        
+        this.pomodoroStart.disabled = false;
+        this.pomodoroPause.disabled = true;
+        this.pomodoroStop.disabled = true;
+        this.pomodoroSkip.disabled = true;
+        
+        this.pomodoroTimer.classList.remove('pomodoro-active');
+        
+        if (this.pomodoroMode === 'work') {
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroWorkDuration.value) * 60;
+        } else if (this.pomodoroMode === 'break') {
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroBreakDuration.value) * 60;
+        } else if (this.pomodoroMode === 'long-break') {
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroLongBreakDuration.value) * 60;
+        }
+        
+        this.updatePomodoroDisplay();
+        this.updatePomodoroStatus();
+    }
+    
+    pomodoroSessionComplete() {
+        clearInterval(this.pomodoroInterval);
+        
+        this.showPomodoroNotification();
+        
+        if (this.pomodoroMode === 'work') {
+            // Switch to break mode
+            if (this.pomodoroCurrentSession % 4 === 0) {
+                // Long break after every 4th session
+                this.pomodoroMode = 'long-break';
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroLongBreakDuration.value) * 60;
+            } else {
+                // Short break
+                this.pomodoroMode = 'break';
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroBreakDuration.value) * 60;
+            }
+        } else {
+            // Switch back to work mode
+            this.pomodoroMode = 'work';
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroWorkDuration.value) * 60;
+            this.pomodoroCurrentSession++;
+            
+            // Reset session counter after completing all 4 sessions + breaks
+            if (this.pomodoroCurrentSession > this.pomodoroTotalSessions) {
+                this.pomodoroCurrentSession = 1;
+            }
+        }
+        
+        this.resetPomodoro();
+        this.updatePomodoroSession();
+        this.updatePomodoroStatus();
+    }
+    
+    showPomodoroNotification() {
+        if (this.pomodoroNotifications.checked && 'Notification' in window && Notification.permission === 'granted') {
+            let title, body;
+            
+            if (this.pomodoroMode === 'work') {
+                if (this.pomodoroCurrentSession % 4 === 0) {
+                    title = 'Work Session Complete! 🎉';
+                    body = 'Time for a long break! You\'ve earned it.';
+                } else {
+                    title = 'Work Session Complete! ✅';
+                    body = 'Time for a short break!';
+                }
+            } else {
+                title = 'Break Complete! 💪';
+                body = 'Ready to get back to work?';
+            }
+            
+            new Notification(title, {
+                body: body,
+                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23e74c3c"/><text x="32" y="40" text-anchor="middle" fill="white" font-size="24">🍅</text></svg>'
+            });
+        }
+        
+        // Also play a sound if possible
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRvQIAABXQVZFZm10IBAAAAABAAEARAAAEAAIAP4AAAB4AQAAfgAAAQD8BAABagAuAogAhgDqAlwCBAA1AD8AVQBOAK0ApQCFAHkAfgCJAIYAhgCCAIQAggCEAIIAggCCAIQAhACCAIQAhACEAIQAggCEAIAAjADgAzYC');
+            audio.volume = 0.3;
+            audio.play().catch(() => {});
+        } catch (e) {}
+    }
+    
+    updatePomodoroDisplay() {
+        const minutes = Math.floor(this.pomodoroTimeRemaining / 60);
+        const seconds = this.pomodoroTimeRemaining % 60;
+        const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        this.pomodoroTimer.textContent = display;
+        
+        // Update timer color based on mode
+        this.pomodoroTimer.className = 'pomodoro-timer';
+        if (this.pomodoroMode === 'work') {
+            this.pomodoroTimer.classList.add('work-mode');
+        } else if (this.pomodoroMode === 'break') {
+            this.pomodoroTimer.classList.add('break-mode');
+        } else if (this.pomodoroMode === 'long-break') {
+            this.pomodoroTimer.classList.add('long-break-mode');
+        }
+        
+        if (this.pomodoroIsRunning) {
+            this.pomodoroTimer.classList.add('pomodoro-active');
+        }
+    }
+    
+    updatePomodoroStatus() {
+        let status;
+        if (this.pomodoroIsPaused) {
+            status = 'Paused';
+        } else if (this.pomodoroIsRunning) {
+            if (this.pomodoroMode === 'work') {
+                status = 'Focus time! 🎯';
+            } else if (this.pomodoroMode === 'break') {
+                status = 'Short break 😌';
+            } else if (this.pomodoroMode === 'long-break') {
+                status = 'Long break 🌴';
+            }
+        } else {
+            if (this.pomodoroMode === 'work') {
+                status = 'Ready to focus';
+            } else if (this.pomodoroMode === 'break') {
+                status = 'Break time ready';
+            } else if (this.pomodoroMode === 'long-break') {
+                status = 'Long break ready';
+            }
+        }
+        
+        this.pomodoroStatus.textContent = status;
+    }
+    
+    updatePomodoroSession() {
+        let sessionText;
+        if (this.pomodoroMode === 'work') {
+            sessionText = `Session ${this.pomodoroCurrentSession} of ${this.pomodoroTotalSessions}`;
+        } else if (this.pomodoroMode === 'break') {
+            sessionText = `Break after session ${this.pomodoroCurrentSession - 1}`;
+        } else if (this.pomodoroMode === 'long-break') {
+            sessionText = `Long break - Session ${this.pomodoroCurrentSession - 1} complete!`;
+        }
+        
+        this.pomodoroSession.textContent = sessionText;
     }
 }
 

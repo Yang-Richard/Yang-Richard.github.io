@@ -2885,3 +2885,171 @@ label.settings-btn + .setting-description {
     font-weight: bold;
 }
 
+/* Pomodoro Timer Styles */
+.pomodoro-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.pomodoro-display {
+    margin-bottom: 20px;
+}
+
+.pomodoro-timer {
+    font-size: 48px;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-family: 'Courier New', monospace;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.pomodoro-status {
+    font-size: 18px;
+    color: #7f8c8d;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.pomodoro-session {
+    font-size: 14px;
+    color: #95a5a6;
+    margin-bottom: 20px;
+}
+
+.pomodoro-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+.pomodoro-btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pomodoro-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.pomodoro-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.pomodoro-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.pomodoro-start {
+    background-color: #27ae60;
+    color: white;
+}
+
+.pomodoro-start:hover:not(:disabled) {
+    background-color: #219a52;
+}
+
+.pomodoro-pause {
+    background-color: #f39c12;
+    color: white;
+}
+
+.pomodoro-pause:hover:not(:disabled) {
+    background-color: #d68910;
+}
+
+.pomodoro-stop {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.pomodoro-stop:hover:not(:disabled) {
+    background-color: #c0392b;
+}
+
+.pomodoro-skip {
+    background-color: #3498db;
+    color: white;
+}
+
+.pomodoro-skip:hover:not(:disabled) {
+    background-color: #2980b9;
+}
+
+.pomodoro-settings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    text-align: left;
+    border-top: 2px solid #ecf0f1;
+    padding-top: 20px;
+}
+
+.pomodoro-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.pomodoro-setting label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #34495e;
+}
+
+.pomodoro-setting input[type="number"] {
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.pomodoro-setting input[type="number"]:focus {
+    border-color: #3498db;
+    outline: none;
+}
+
+.pomodoro-setting input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.pomodoro-active {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.pomodoro-timer.work-mode {
+    color: #27ae60;
+}
+
+.pomodoro-timer.break-mode {
+    color: #3498db;
+}
+
+.pomodoro-timer.long-break-mode {
+    color: #9b59b6;
+}
+

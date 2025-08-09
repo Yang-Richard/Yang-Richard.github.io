@@ -2233,6 +2233,7 @@ label.settings-btn + .setting-description {
     resize: vertical;
     transition: border-color 0.3s ease;
     margin-bottom: 15px;
+    min-height: 300px;
 }
 
 .recurring-input-section textarea:focus {

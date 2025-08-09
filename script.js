@@ -781,7 +781,7 @@ class DailyTodoApp {
         
         // Example 1: Daily standup meeting
         const dailyStandup = {
-            id: this.generateRecurringId(),
+            id: -2,
             text: "Reoccuring - Daily standup meeting",
             frequency: {
                 type: 'daily',
@@ -796,7 +796,7 @@ class DailyTodoApp {
         
         // Example 2: Weekly team retrospective (Fridays)
         const weeklyRetrospective = {
-            id: this.generateRecurringId(),
+            id: -1,
             text: "Reoccuring - Weekly team retrospective",
             frequency: {
                 type: 'weekly',
@@ -6376,7 +6376,7 @@ class DailyTodoApp {
     }
     
     calculateDueDate(instanceDate, offset) {
-        if (offset === 0 || offset === -1) return null;
+        if (offset === -1) return null;
         
         const dueDate = new Date(instanceDate);
         dueDate.setDate(dueDate.getDate() + offset);
@@ -6388,7 +6388,7 @@ class DailyTodoApp {
         this.dailyInterval.value = '1';
         this.weeklyDay.value = '1';
         this.monthlyDate.value = '1';
-        this.dueDateOffset.value = '0';
+        this.dueDateOffset.value = '-1';
         this.recurringHighPriority.checked = false;
         this.setDefaultRecurringDates();
         this.autoResizeTextarea(this.recurringTaskInput);
@@ -6760,7 +6760,7 @@ class DailyTodoApp {
                 localStorage.setItem('lastAutosaveTime', new Date().toISOString());
                 await this.updateAutosaveStatus();
 
-                console.log("Autosaved: ", this.autosaveFileHandle, new Date().toISOString());
+                console.log("Autosaved: ", new Date().toISOString());
             }
         } catch (error) {
             console.error('Autosave failed:', error);

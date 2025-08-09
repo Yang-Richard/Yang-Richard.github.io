@@ -20,17 +20,10 @@ class DailyTodoApp {
         this.nextMonthBtn = document.getElementById('nextMonth');
         this.undoBtn = document.getElementById('undoBtn');
         this.newSectionBtn = document.getElementById('newSectionBtn');
-        // These elements were moved to settings panel
-        // this.exportBtn = document.getElementById('exportBtn');
-        // this.importFile = document.getElementById('importFile');
-        // this.importCsvFile = document.getElementById('importCsvFile');
         this.moveKanbanBtn = document.getElementById('moveKanbanBtn');
         this.deleteNewItemsBtn = document.getElementById('deleteNewItemsBtn');
         this.deleteDayBtn = document.getElementById('deleteDayBtn');
         this.deleteWeekBtn = document.getElementById('deleteWeekBtn');
-        // These elements were moved to settings panel
-        // this.deleteAllBtn = document.getElementById('deleteAllBtn');
-        // this.clearStorageBtn = document.getElementById('clearStorageBtn');
         this.weekButtons = document.getElementById('weekButtons');
         this.relativeDateInfoElement = document.getElementById('relativeDateInfo');
         this.todayBtn = document.getElementById('todayBtn');
@@ -55,8 +48,6 @@ class DailyTodoApp {
         this.searchNavBtn = document.getElementById('searchNavBtn');
         this.showExampleBtn = document.getElementById('showExampleBtn');
         this.cleanBoardBtn = document.getElementById('cleanBoardBtn');
-        // This element was moved to settings panel
-        // this.clearVisibleBoardsBtn = document.getElementById('clearVisibleBoardsBtn');
         
         // Panel elements
         this.todoPanel = document.getElementById('todoPanel');
@@ -201,15 +192,12 @@ class DailyTodoApp {
             nextMonthBtn: () => this.changeMonth(1),
             undoBtn: () => this.performUndo(),
             newSectionBtn: () => this.createNewSection(),
-            // exportBtn: () => this.exportData(), // Moved to settings
             moveKanbanBtn: () => this.moveKanbanToNextDay(),
             deleteNewItemsBtn: () => this.deleteNewItems(),
             emptyTrashBtn: () => this.emptyTrash(),
             deleteMiscItemsBtn: () => this.deleteMiscItems(),
             deleteDayBtn: () => this.deleteCurrentDay(),
             deleteWeekBtn: () => this.deleteCurrentWeek(),
-            // deleteAllBtn: () => this.deleteAllData(), // Moved to settings
-            // clearStorageBtn: () => this.clearAllStorage() // Moved to settings
         };
         
         Object.entries(clickHandlers).forEach(([elementName, handler]) => {
@@ -217,10 +205,6 @@ class DailyTodoApp {
                 this[elementName].addEventListener('click', handler);
             }
         });
-        
-        // Import file listeners moved to settings panel
-        // this.importFile.addEventListener('change', (e) => this.importData(e));
-        // this.importCsvFile.addEventListener('change', (e) => this.importCsvData(e));
         
         // Navigation buttons
         this.todoNavBtn.addEventListener('click', () => this.switchPanel('todo'));
@@ -234,8 +218,6 @@ class DailyTodoApp {
         this.searchNavBtn.addEventListener('click', () => this.switchPanel('search'));
         this.showExampleBtn.addEventListener('click', () => this.showExample());
         this.cleanBoardBtn.addEventListener('click', () => this.clearVisibleBoards());
-        // Clear visible boards listener moved to settings panel
-        // this.clearVisibleBoardsBtn.addEventListener('click', () => this.clearVisibleBoards());
         
         // Notes functionality
         this.notesTextarea.addEventListener('input', () => this.saveNotes());
@@ -513,16 +495,49 @@ class DailyTodoApp {
         // Add event listeners only once
         if (!this.settingsEventListenersAdded) {
             // Add event listeners for settings changes
-            document.getElementById('autosaveEnabled').addEventListener('change', (e) => {
+            document.getElementById('autosaveEnabled').addEventListener('change', async (e) => {
                 const isEnabled = e.target.checked;
-                localStorage.setItem('autosaveEnabled', isEnabled);
-                this.autosaveEnabled = isEnabled;
                 
-                // Always restart the interval to ensure proper state
-                this.restartAutosaveInterval();
-                
-                // Update the status display
-                this.updateAutosaveStatus();
+                if (isEnabled) {
+                    // Check if we have a file selected
+                    const hasFileHandle = this.autosaveFileHandle || await this.getStoredFileHandle();
+                    
+                    if (!hasFileHandle) {
+                        // Prompt user to select a file first
+                        if (confirm('Autosave requires selecting a file location. Would you like to choose one now?')) {
+                            try {
+                                await this.selectAutosaveFile();
+                                // File was selected successfully, proceed with enabling
+                                localStorage.setItem('autosaveEnabled', isEnabled);
+                                this.autosaveEnabled = isEnabled;
+                                this.restartAutosaveInterval();
+                                this.updateAutosaveStatus();
+                            } catch (error) {
+                                // User cancelled file selection, uncheck the checkbox
+                                e.target.checked = false;
+                                this.showFeedback('Autosave not enabled - no file selected', 'error');
+                                return;
+                            }
+                        } else {
+                            // User declined to select a file, uncheck the checkbox
+                            e.target.checked = false;
+                            this.showFeedback('Autosave not enabled - no file selected', 'error');
+                            return;
+                        }
+                    } else {
+                        // File is available, proceed normally
+                        localStorage.setItem('autosaveEnabled', isEnabled);
+                        this.autosaveEnabled = isEnabled;
+                        this.restartAutosaveInterval();
+                        this.updateAutosaveStatus();
+                    }
+                } else {
+                    // Disabling autosave, proceed normally
+                    localStorage.setItem('autosaveEnabled', isEnabled);
+                    this.autosaveEnabled = isEnabled;
+                    this.restartAutosaveInterval();
+                    this.updateAutosaveStatus();
+                }
             });
             
             document.getElementById('autosaveInterval').addEventListener('change', (e) => {
@@ -734,7 +749,6 @@ class DailyTodoApp {
             this.notesTextarea.value = window.NotesContent.getDefaultContent();
         }
 
-        // Set placeholder text from external file
         this.notesTextarea.placeholder = window.NotesContent.getPlaceholderText();
     }
     
@@ -807,10 +821,10 @@ class DailyTodoApp {
         // Example 1: Daily standup meeting
         const dailyStandup = {
             id: "Recurring Example 1",
-            text: "Daily standup meeting",
+            text: "10 day standup sync",
             frequency: {
                 type: 'daily',
-                interval: 1
+                interval: 10
             },
             dueDateOffset: 0,
             startDate: '2025-08-08',
@@ -1293,8 +1307,6 @@ class DailyTodoApp {
         };
         localStorage.setItem(`dailyTodos_${dateKey}`, JSON.stringify(todos));
         
-        // Disable autodebugexport in console for now
-        //this.autoDebugExport();
     }
     
     saveGlobalUnsortedItems() {
@@ -1524,6 +1536,7 @@ class DailyTodoApp {
         this.renderWeekView();
         this.loadTodosForDate();
         this.syncCalendarToCurrentDate();
+        this.updateCalendarColors();
         this.updateDefaultDueDateInputs();
     }
     
@@ -1668,6 +1681,7 @@ class DailyTodoApp {
                 this.renderWeekView();
                 this.loadTodosForDate();
                 this.syncCalendarToCurrentDate();
+                this.updateCalendarColors();
                 this.updateDefaultDueDateInputs();
             });
             
@@ -2366,10 +2380,6 @@ class DailyTodoApp {
             
             console.log('Export download triggered');
             this.showFeedback('Data exported successfully!');
-            
-            //disable debugexporttofolder
-            //this.debugExportToFolder(jsonString);
-
         } catch (error) {
             console.error('Export failed:', error);
             this.showFeedback('Export failed: ' + error.message, 'error');
@@ -3278,7 +3288,7 @@ class DailyTodoApp {
         const allKeys = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key.startsWith('dailyTodos_')) {
+            if (key.startsWith('dailyTodos_') && key !== 'dailyTodos_notes' && key !== 'dailyTodos_whiteboard') {
                 allKeys.push(key);
             }
         }
@@ -3288,24 +3298,22 @@ class DailyTodoApp {
             return;
         }
         
-        if (confirm(`⚠️ DELETE ALL TODO DATA?\n\nThis will permanently delete ALL your todos from ALL days (${allKeys.length} days total).\n\nThis action cannot be undone and will clear your entire todo history.`)) {
-            if (confirm(`🚨 FINAL CONFIRMATION\n\nYou are about to delete ${allKeys.length} days of todo data.\n\nTHIS WILL DELETE EVERYTHING!\n\n`)) {
+        if (confirm(`⚠️ DELETE ALL TODO DATA?\n\nThis will permanently delete ALL your todos from ALL days (${allKeys.length} days total).\n\nThis action cannot be undone and will clear your entire todo history.\n\nNotes and sketches will remain intact.`)) {
+            if (confirm(`🚨 FINAL CONFIRMATION\n\nYou are about to delete ${allKeys.length} days of todo data.\n\nTHIS WILL DELETE ALL TODO ITEMS!\n\nNotes and sketches will be preserved.`)) {
                 allKeys.forEach(key => localStorage.removeItem(key));
                 // Also delete global data
                 localStorage.removeItem('globalUnsortedItems');
                 localStorage.removeItem('dailyTodos_trash');
                 localStorage.removeItem('recurringTasks');
                 localStorage.removeItem('backburnerItems');
-                localStorage.removeItem('dailyTodos_notes');
-                localStorage.removeItem('dailyTodos_whiteboard');
+                // Note: NOT deleting notes and whiteboard - those stay intact
                 this.loadTodosForDate();
                 this.loadTrashItems();
                 this.loadRecurringTasks();
                 this.loadBackburnerItems();
-                this.loadNotes();
-                this.loadWhiteboard();
+                // Note: NOT reloading notes and whiteboard since we didn't delete them
                 this.updateStatistics();
-                this.showFeedback(`Deleted all todo data (${allKeys.length} days + all items everywhere)`);
+                this.showFeedback(`Deleted all todo data (${allKeys.length} days + all todo items). Notes and sketches preserved.`);
             }
         }
     }
@@ -4176,6 +4184,7 @@ class DailyTodoApp {
             this.updateInfoSection();
             this.renderWeekView();
             this.syncCalendarToCurrentDate();
+            this.updateCalendarColors();
             
             // Clear current items and reload for the date (this will include our restored item)
             this.clearAllItems();
@@ -5285,6 +5294,7 @@ class DailyTodoApp {
             });
             
             this.saveTodosForDate();
+            this.updateCalendarColors();
             this.showFeedback(`Moved ${itemCount} items to ${nextDateStr}`);
         }
     }
@@ -5741,6 +5751,7 @@ class DailyTodoApp {
             // Reload the UI
             this.loadTodosForDate();
             this.loadTrashItems();
+            this.updateCalendarColors();
             
             this.showFeedback(`Undid: ${lastState.description}`);
         } else {
@@ -6186,7 +6197,6 @@ class DailyTodoApp {
         
         const defaultDueDate = this.getDefaultDueDate();
         
-        // Debug logging
         console.log('Updating default due date inputs:', {
             setting,
             currentDate: this.currentDate.toISOString().split('T')[0],
@@ -6862,7 +6872,6 @@ class DailyTodoApp {
     }
     
     async createDefaultAutosaveFile() {
-        // This function is no longer used - we don't auto-prompt for file selection
         console.log('createDefaultAutosaveFile called but no longer used');
     }
     

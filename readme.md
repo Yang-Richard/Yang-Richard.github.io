@@ -1,4 +1,6 @@
-# 📋 Daily Todo Kanban Board
+# https://yang-richard.github.io/
+
+## 📋 Daily Todo Kanban Board
 
 Welcome to your comprehensive daily productivity app! This browser-based tool combines todo management, kanban workflow, note-taking, creative sketching, and powerful recurring tasks all in one interface.
 

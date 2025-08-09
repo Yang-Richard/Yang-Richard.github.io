@@ -52,6 +52,7 @@ class DailyTodoApp {
         this.sketchNavBtn = document.getElementById('sketchNavBtn');
         this.wikiNavBtn = document.getElementById('wikiNavBtn');
         this.settingsNavBtn = document.getElementById('settingsNavBtn');
+        this.searchNavBtn = document.getElementById('searchNavBtn');
         this.showExampleBtn = document.getElementById('showExampleBtn');
         this.cleanBoardBtn = document.getElementById('cleanBoardBtn');
         // This element was moved to settings panel
@@ -68,6 +69,7 @@ class DailyTodoApp {
         this.wikiPanel = document.getElementById('wikiPanel');
         this.wikiContent = document.getElementById('wikiContent');
         this.settingsPanel = document.getElementById('settingsPanel');
+        this.searchPanel = document.getElementById('searchPanel');
         
         // Backburner elements
         this.backburnerInput = document.getElementById('backburnerInput');
@@ -229,6 +231,7 @@ class DailyTodoApp {
         this.sketchNavBtn.addEventListener('click', () => this.switchPanel('sketch'));
         this.wikiNavBtn.addEventListener('click', () => this.switchPanel('wiki'));
         this.settingsNavBtn.addEventListener('click', () => this.switchPanel('settings'));
+        this.searchNavBtn.addEventListener('click', () => this.switchPanel('search'));
         this.showExampleBtn.addEventListener('click', () => this.showExample());
         this.cleanBoardBtn.addEventListener('click', () => this.clearVisibleBoards());
         // Clear visible boards listener moved to settings panel
@@ -392,6 +395,7 @@ class DailyTodoApp {
         this.sketchPanel.classList.add('hidden');
         this.wikiPanel.classList.add('hidden');
         this.settingsPanel.classList.add('hidden');
+        this.searchPanel.classList.add('hidden');
         this.centerSectionBackburner.classList.add('hidden');
         this.centerSectionRecurring.classList.add('hidden');
         
@@ -408,6 +412,7 @@ class DailyTodoApp {
         this.sketchNavBtn.classList.remove('active');
         this.wikiNavBtn.classList.remove('active');
         this.settingsNavBtn.classList.remove('active');
+        this.searchNavBtn.classList.remove('active');
         
         // Show selected panel and activate button
         switch(panelName) {
@@ -473,6 +478,19 @@ class DailyTodoApp {
                 this.rightPanel.classList.add('hidden');
                 this.settingsNavBtn.classList.add('active');
                 this.loadSettings();
+                break;
+            case 'search':
+                this.searchPanel.classList.remove('hidden');
+                this.centerSection.classList.add('hidden');
+                this.rightPanel.classList.add('hidden');
+                this.searchNavBtn.classList.add('active');
+                this.initializeSearch();
+                // Always refresh search results when switching to search panel
+                setTimeout(() => {
+                    if (this.searchInput && this.searchInput.value.trim()) {
+                        this.performSearch(this.searchInput.value);
+                    }
+                }, 50);
                 break;
         }
     }
@@ -3347,7 +3365,7 @@ class DailyTodoApp {
                 localStorage.removeItem('dailyTodos_trash');
                 
                 // Clear DOM elements
-                this.trashColumns.innerHTML = '<div class="panel-content" style="text-align: center; color: #7f8c8d; padding: 40px;">Clean trash bin!</div>';
+                this.trashColumns.innerHTML = '<div class="panel-content" style="text-align: center; color: #7f8c8d; padding: 40px;"> </div>';
                 
                 this.updateAllItemCounts();
                 this.showFeedback(`Emptied trash - deleted ${itemCount} item${itemCount !== 1 ? 's' : ''}`);
@@ -4379,13 +4397,13 @@ class DailyTodoApp {
         // Get trash data from localStorage instead of DOM
         const savedTrash = localStorage.getItem('dailyTodos_trash');
         if (!savedTrash) {
-            this.trashColumns.innerHTML = '<div class="panel-content" style="text-align: center; color: #7f8c8d; padding: 40px;">Clean trash bin!</div>';
+            this.trashColumns.innerHTML = '<div class="panel-content" style="text-align: center; color: #7f8c8d; padding: 40px;"> </div>';
             return;
         }
         
         const trashData = JSON.parse(savedTrash);
         if (trashData.length === 0) {
-            this.trashColumns.innerHTML = '<div class="panel-content" style="text-align: center; color: #7f8c8d; padding: 40px;">Clean trash bin!</div>';
+            this.trashColumns.innerHTML = '<div class="panel-content" style="text-align: center; color: #7f8c8d; padding: 40px;"> </div>';
             return;
         }
         
@@ -7109,6 +7127,349 @@ class DailyTodoApp {
             case 86400000: return 'every 24 hours';
             default: return 'every minute';
         }
+    }
+    
+    initializeSearch() {
+        this.searchInput = document.getElementById('searchInput');
+        this.searchBtn = document.getElementById('searchBtn');
+        this.clearSearchBtn = document.getElementById('clearSearchBtn');
+        this.searchResultsCount = document.getElementById('searchResultsCount');
+        this.searchResults = document.getElementById('searchResults');
+        
+        if (this.searchInput && !this.searchInput.dataset.initialized) {
+            this.searchInput.addEventListener('input', (e) => this.performSearch(e.target.value));
+            this.searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.performSearch(e.target.value);
+                }
+            });
+            this.searchInput.dataset.initialized = 'true';
+        }
+        
+        if (this.searchBtn && !this.searchBtn.dataset.initialized) {
+            this.searchBtn.addEventListener('click', () => {
+                this.performSearch(this.searchInput.value);
+            });
+            this.searchBtn.dataset.initialized = 'true';
+        }
+        
+        if (this.clearSearchBtn && !this.clearSearchBtn.dataset.initialized) {
+            this.clearSearchBtn.addEventListener('click', () => {
+                this.searchInput.value = '';
+                this.clearSearchResults();
+            });
+            this.clearSearchBtn.dataset.initialized = 'true';
+        }
+    }
+    
+    performSearch(searchTerm) {
+        const trimmedTerm = searchTerm.trim().toLowerCase();
+        
+        if (!trimmedTerm) {
+            this.clearSearchResults();
+            return;
+        }
+        
+        const results = this.searchAllItems(trimmedTerm);
+        this.displaySearchResults(results, trimmedTerm);
+    }
+    
+    searchAllItems(searchTerm) {
+        const allItems = [];
+        
+        // Search daily todos
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('dailyTodos_') && !key.endsWith('_notes') && !key.endsWith('_trash') && !key.endsWith('_whiteboard')) {
+                const dateKey = key.replace('dailyTodos_', '');
+                const data = JSON.parse(localStorage.getItem(key) || '{}');
+                
+                this.extractItemsFromData(data, allItems, 'daily', dateKey, searchTerm);
+            }
+        }
+        
+        // Search global unsorted items
+        const globalUnsorted = JSON.parse(localStorage.getItem('globalUnsortedItems') || '[]');
+        globalUnsorted.forEach(item => {
+            if (item.text && item.text.toLowerCase().includes(searchTerm)) {
+                allItems.push({
+                    ...item,
+                    source: 'new-items',
+                    date: 'N/A',
+                    column: 'New Items'
+                });
+            }
+        });
+        
+        // Search backburner items
+        const backburnerData = JSON.parse(localStorage.getItem('backburnerItems') || '{"unsortedItems": [], "sections": {}}');
+        
+        // Search backburner unsorted items
+        backburnerData.unsortedItems?.forEach(item => {
+            if (item.text && item.text.toLowerCase().includes(searchTerm)) {
+                allItems.push({
+                    ...item,
+                    source: 'backburner',
+                    date: 'N/A',
+                    column: 'Backburner'
+                });
+            }
+        });
+        
+        // Search backburner sections
+        Object.values(backburnerData.sections || {}).forEach(section => {
+            this.extractItemsFromData(section, allItems, 'backburner', 'N/A', searchTerm);
+        });
+        
+        // Search trash items
+        const trashData = JSON.parse(localStorage.getItem('dailyTodos_trash') || '[]');
+        trashData.forEach(item => {
+            if (item.text && item.text.toLowerCase().includes(searchTerm)) {
+                allItems.push({
+                    ...item,
+                    source: 'trash',
+                    date: item.originalDate ? this.formatDateForDisplay(item.originalDate) : 'N/A',
+                    column: item.originalColumn || 'Trash'
+                });
+            }
+        });
+        
+        return allItems;
+    }
+    
+    extractItemsFromData(data, allItems, source, dateKey, searchTerm) {
+        const columns = ['todo', 'inProgress', 'done'];
+        
+        columns.forEach(columnType => {
+            const items = data[columnType] || [];
+            items.forEach(item => {
+                if (item.text && item.text.toLowerCase().includes(searchTerm)) {
+                    allItems.push({
+                        ...item,
+                        source: source,
+                        date: dateKey === 'N/A' ? 'N/A' : this.formatDateForDisplay(dateKey),
+                        originalDateKey: dateKey,
+                        column: this.getColumnDisplayName(columnType),
+                        sectionName: data.name || null
+                    });
+                }
+            });
+        });
+        
+        // Search sections if they exist
+        if (data.sections) {
+            Object.values(data.sections).forEach(section => {
+                columns.forEach(columnType => {
+                    const items = section[columnType] || [];
+                    items.forEach(item => {
+                        if (item.text && item.text.toLowerCase().includes(searchTerm)) {
+                            allItems.push({
+                                ...item,
+                                source: source,
+                                date: dateKey === 'N/A' ? 'N/A' : this.formatDateForDisplay(dateKey),
+                                originalDateKey: dateKey,
+                                column: this.getColumnDisplayName(columnType),
+                                sectionName: section.name || 'Unnamed Section'
+                            });
+                        }
+                    });
+                });
+            });
+        }
+    }
+    
+    getColumnDisplayName(columnType) {
+        switch (columnType) {
+            case 'todo': return 'To Do';
+            case 'inProgress': return 'In Progress';
+            case 'done': return 'Done';
+            default: return columnType;
+        }
+    }
+    
+    formatDateForDisplay(dateKey) {
+        if (dateKey === 'N/A') return 'N/A';
+        
+        try {
+            const date = new Date(dateKey);
+            // Fix timezone issue by adding 1 day
+            date.setDate(date.getDate() + 1);
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            const dateStr = date.toDateString();
+            const todayStr = today.toDateString();
+            const yesterdayStr = yesterday.toDateString();
+            const tomorrowStr = tomorrow.toDateString();
+            
+            if (dateStr === todayStr) return 'Today';
+            if (dateStr === yesterdayStr) return 'Yesterday';
+            if (dateStr === tomorrowStr) return 'Tomorrow';
+            
+            return date.toLocaleDateString();
+        } catch (error) {
+            return dateKey;
+        }
+    }
+    
+    displaySearchResults(results, searchTerm) {
+        this.searchResultsCount.textContent = `Found ${results.length} item${results.length !== 1 ? 's' : ''} matching "${searchTerm}"`;
+        
+        if (results.length === 0) {
+            this.searchResults.innerHTML = '<div class="search-result-item" style="text-align: center; color: #7f8c8d;">No items found</div>';
+            return;
+        }
+        
+        const resultsHtml = results.map(item => this.createSearchResultHtml(item, searchTerm)).join('');
+        this.searchResults.innerHTML = resultsHtml;
+        
+        // Add event listeners to buttons
+        this.searchResults.querySelectorAll('.search-action-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleSearchAction(e));
+        });
+    }
+    
+    createSearchResultHtml(item, searchTerm) {
+        const highlightedText = this.highlightSearchTerm(item.text, searchTerm);
+        
+        return `
+            <div class="search-result-item">
+                <div class="search-result-text">${highlightedText}</div>
+                <div class="search-result-meta">
+                    <span>📅 ${item.date}</span>
+                    ${(item.source === 'daily' || item.source === 'trash') ? `<span>📋 ${item.column}</span>` : ''}
+                    ${item.sectionName ? `<span>📁 ${item.sectionName}</span>` : ''}
+                    ${item.source ? `<span>🔍 ${this.getSourceDisplayName(item.source)}</span>` : ''}
+                    ${item.dueDate ? `<span>⏰ Due: ${this.formatDateForDisplay(item.dueDate)}</span>` : ''}
+                    ${item.highPriority ? '<span style="background: #e74c3c; color: white;">❗ High Priority</span>' : ''}
+                </div>
+                <div class="search-result-actions">
+                    ${this.getActionButtons(item)}
+                </div>
+            </div>
+        `;
+    }
+    
+    getSourceDisplayName(source) {
+        switch (source) {
+            case 'daily': return 'TODO';
+            case 'new-items': return 'New Items';
+            case 'backburner': return 'Backburner';
+            case 'trash': return 'Trash';
+            default: return source;
+        }
+    }
+    
+    getActionButtons(item) {
+        let buttons = '';
+        
+        // Navigation button for daily items - show for any item from daily todos
+        if (item.source === 'daily') {
+            const displayDate = item.date && item.date !== 'N/A' ? item.date : 'that day';
+            const dateKey = item.originalDateKey || item.date;
+            buttons += `<button class="search-action-btn search-action-nav" data-action="navigate" data-date="${dateKey}" data-item-id="${item.id}">📍 Go to ${displayDate}</button>`;
+        }
+        
+        // Add to new items button
+        buttons += `<button class="search-action-btn search-action-add" data-action="add-new-items" data-text="${this.escapeAttribute(item.text)}" data-due-date="${item.dueDate || ''}" data-high-priority="${item.highPriority || false}">➕ Add to New Items</button>`;
+        
+        // Add to backburner button
+        buttons += `<button class="search-action-btn search-action-backburner" data-action="add-backburner" data-text="${this.escapeAttribute(item.text)}" data-due-date="${item.dueDate || ''}" data-high-priority="${item.highPriority || false}">🔄 Add to Backburner</button>`;
+        
+        return buttons;
+    }
+    
+    escapeAttribute(text) {
+        return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    
+    highlightSearchTerm(text, searchTerm) {
+        if (!searchTerm) return this.escapeHtml(text);
+        
+        const regex = new RegExp(`(${this.escapeRegex(searchTerm)})`, 'gi');
+        return this.escapeHtml(text).replace(regex, '<span class="search-highlight">$1</span>');
+    }
+    
+    escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    
+    handleSearchAction(event) {
+        const button = event.target;
+        const action = button.dataset.action;
+        
+        switch (action) {
+            case 'navigate':
+                this.navigateToDateFromSearch(button.dataset.date);
+                break;
+            case 'add-new-items':
+                this.addToNewItems(button.dataset.text, button.dataset.dueDate, button.dataset.highPriority === 'true');
+                break;
+            case 'add-backburner':
+                this.addToBackburner(button.dataset.text, button.dataset.dueDate, button.dataset.highPriority === 'true');
+                break;
+        }
+    }
+    
+    navigateToDateFromSearch(dateStr) {
+        try {
+            let targetDate;
+            
+            if (dateStr === 'Today') {
+                targetDate = new Date();
+            } else if (dateStr === 'Yesterday') {
+                targetDate = new Date();
+                targetDate.setDate(targetDate.getDate() - 1);
+            } else if (dateStr === 'Tomorrow') {
+                targetDate = new Date();
+                targetDate.setDate(targetDate.getDate() + 1);
+            } else {
+                targetDate = new Date(dateStr);
+                if (isNaN(targetDate.getTime())) {
+                    throw new Error('Invalid date format');
+                }
+                // Fix timezone issue by adding 1 day for navigation
+                targetDate.setDate(targetDate.getDate() + 1);
+            }
+            
+            targetDate.setHours(0, 0, 0, 0); // Normalize time
+            this.switchPanel('todo');
+            this.navigateToDate(targetDate); // Use existing method
+            this.showFeedback('Navigated to ' + (targetDate.toLocaleDateString() || dateStr), 'success');
+        } catch (error) {
+            this.showFeedback('Error navigating to date: ' + dateStr, 'error');
+        }
+    }
+    
+    addToNewItems(text, dueDate, isHighPriority) {
+        const item = this.createTodoItem(text, null, null, null, null, dueDate, 'todo', isHighPriority);
+        this.unsortedItems.appendChild(item);
+        this.saveGlobalUnsortedItems();
+        this.updateAllItemCounts();
+        this.showFeedback('Added to New Items', 'success');
+    }
+    
+    addToBackburner(text, dueDate, isHighPriority) {
+        const item = this.createTodoItem(text, null, null, null, null, dueDate, 'backburner', isHighPriority);
+        
+        // Get backburner unsorted container
+        const backburnerUnsorted = document.getElementById('backburnerUnsortedItems');
+        if (backburnerUnsorted) {
+            backburnerUnsorted.appendChild(item);
+            this.saveBackburnerItems();
+            this.updateBackburnerItemCounts();
+            this.showFeedback('Added to Backburner', 'success');
+        } else {
+            this.showFeedback('Error adding to backburner', 'error');
+        }
+    }
+    
+    clearSearchResults() {
+        this.searchResultsCount.textContent = 'Enter text to search...';
+        this.searchResults.innerHTML = '';
     }
 }
 

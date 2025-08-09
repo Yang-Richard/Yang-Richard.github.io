@@ -4,11 +4,17 @@ window.ChangelogContent = {
         return `
             <br>
             <div class="changelog-entries">
+                <p><strong>v4.0 - 2025-08-09</strong></p>
+                <ul>
+                    <li>Search panel and functionality</li>
+                    <li>Bug fixes </li>
+                </ul>
+                <br>
                 <p><strong>v3.3 - 2025-08-09</strong></p>
                 <ul>
                     <li>Added auto saving feature on Chrome, Brave, Edge</li>
                     <li>Added text box to each day </li>
-                    <li>Lots of bug fixes </li>
+                    <li>Bug fixes </li>
                 </ul>
                 <br>
                 <p><strong>v2.0 - 2025-08-07</strong></p>

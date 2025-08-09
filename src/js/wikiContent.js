@@ -57,6 +57,14 @@ The management interface shows all configured recurring tasks with their unique 
 
 All recurring task instances maintain their permanent association through persistent IDs like "Recurring 1" or "Recurring 2". You can see this information by hovering over any recurring item, which displays "Recurring: [frequency]" in the tooltip. Items never lose their recurring association once created, and you can safely move them between dates while preserving this connection.
 
+### 🔍 SEARCH Panel - Find & Navigate Items
+
+The Search panel provides powerful full-text search across all your todo items, regardless of which panel, date, or section they're stored in. Simply type in the search box to find items by their text content—search works across daily todos, new items, backburner items, and all organized sections.
+
+Search results display each item with helpful metadata including the date, column status (To Do, In Progress, Done), section name, source location, due dates, and priority markers. Each search result includes action buttons to help you work with found items: navigate directly to the day where a daily todo item is located, add a copy of any found item to your New Items panel for today's work, or add a copy to your Backburner for long-term storage.
+
+The search is case-insensitive and highlights matching text within results. Search terms are highlighted in yellow within the item text to help you quickly identify why each item matched your query. This makes it easy to rediscover forgotten tasks, find specific project items across different days, or locate items you want to duplicate for similar work.
+
 ### 🗑️ TRASH Panel - Safe Deletion & Recovery
 
 The smart trash system preserves your work and provides peace of mind when deleting items. All deleted items are organized by date so you can see when they were removed, and the system preserves full metadata including original dates, priorities, sections, and recurring IDs.

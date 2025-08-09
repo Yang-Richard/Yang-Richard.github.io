@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>To-Do Board</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="src/css/style.css">
 </head>
 <body>
     <div class="container">
@@ -13,10 +13,13 @@
                 <span class="nav-text">TODO</span>
             </button>
             <button id="backburnerNavBtn" class="nav-sidebar-btn" data-panel="backburner">
-                <span class="nav-text">BACKBURNER</span>
+                <span class="nav-text">LATER</span>
             </button>
             <button id="recurringNavBtn" class="nav-sidebar-btn" data-panel="recurring">
                 <span class="nav-text">RECURRING</span>
+            </button>
+            <button id="searchNavBtn" class="nav-sidebar-btn" data-panel="search">
+                <span class="nav-text">SEARCH</span>
             </button>
             <button id="trashNavBtn" class="nav-sidebar-btn" data-panel="trash">
                 <span class="nav-text">TRASH</span>
@@ -154,7 +157,7 @@
             <!-- Hidden panels for other views -->
             <div class="left-panel hidden" id="backburnerPanel">
                 <div class="input-section">
-                    <textarea id="backburnerInput" placeholder="Enter a new backburner item..." rows="3"></textarea>
+                    <textarea id="backburnerInput" placeholder="Enter a new item to do later..." rows="3"></textarea>
                     <div class="due-date-section">
                         <div class="date-priority-row">
                             <input type="date" id="backburnerDueDateInput">
@@ -169,7 +172,7 @@
                 </div>
                 
                 <div class="unsorted-pane">
-                    <h3>Misc Items <span id="miscItemsCount" class="item-count">(0)</span></h3>
+                    <h3>Do these later .. <span id="miscItemsCount" class="item-count">(0)</span></h3>
                     <div class="items" id="backburnerUnsortedItems"></div>
                     <button id="deleteMiscItemsBtn" class="control-btn" style="margin-top: 10px;">🗑️ Delete All Items</button>
                 </div>
@@ -528,15 +531,38 @@
                     </div>
                 </div>
             </div>
+            
+            <div class="search-panel hidden" id="searchPanel">
+                <div class="search-container">
+                    <div class="search-content">
+                        <div class="search-section search-box">
+                            <div class="search-input-section">
+                                <input type="text" id="searchInput" placeholder="Search through all todo items..." class="search-input">
+                                <button id="searchBtn" class="search-btn">Search</button>
+                                <button id="clearSearchBtn" class="search-btn">Clear</button>
+                            </div>
+                            <div class="search-stats">
+                                <span id="searchResultsCount">Enter text to search...</span>
+                            </div>
+                        </div>
+                        
+                        <div class="search-results-section" id="searchResultsSection">
+                            <div class="search-results" id="searchResults">
+                                <!-- Search results will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
     
-    <script src="wikiContent.js"></script>
-    <script src="markdownParser.js"></script>
-    <script src="notesContent.js"></script>
-    <script src="changelogContent.js"></script>
-    <script src="exampleData.js"></script>
-    <script src="script.js"></script>
+    <script src="src/js/wikiContent.js"></script>
+    <script src="src/js/markdownParser.js"></script>
+    <script src="src/js/notesContent.js"></script>
+    <script src="src/js/changelogContent.js"></script>
+    <script src="src/js/exampleData.js"></script>
+    <script src="src/js/script.js"></script>
 </body>
 </html>

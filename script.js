@@ -1506,6 +1506,7 @@ class DailyTodoApp {
         this.renderWeekView();
         this.loadTodosForDate();
         this.syncCalendarToCurrentDate();
+        this.updateDefaultDueDateInputs();
     }
     
     changeDay(direction) {
@@ -1649,6 +1650,7 @@ class DailyTodoApp {
                 this.renderWeekView();
                 this.loadTodosForDate();
                 this.syncCalendarToCurrentDate();
+                this.updateDefaultDueDateInputs();
             });
             
             // Add drag and drop handlers
@@ -1759,16 +1761,16 @@ class DailyTodoApp {
         
         const itemActionsHTML = panel === 'backburner' ? `
                 <button class="edit-btn" title="Edit task">✏️</button>
-                <button class="copy-new-btn" title="Copy to new items">📥</button>
                 <button class="create-section-btn" title="Create section">📁</button>
+                <button class="copy-new-btn" title="Copy to new items">📥</button>
                 <span></span>
                 ${panelActions}
                 <button class="delete-btn" title="Delete">×</button>
         ` : `
                 <button class="edit-btn" title="Edit task">✏️</button>
                 ${(panel === 'todo' || (panel !== 'backburner' && panel !== 'trash')) ? '<button class="move-btn" title="Move to next business day">➡️</button>' : ''}
-                <button class="copy-new-btn" title="Copy to new items">📥</button>
                 <button class="create-section-btn" title="Create section">📁</button>
+                <button class="copy-new-btn" title="Copy to new items">📥</button>
                 ${panelActions}
                 <button class="delete-btn" title="Delete">×</button>
         `;
@@ -1976,6 +1978,7 @@ class DailyTodoApp {
                 this.renderWeekView();
                 this.loadTodosForDate();
                 this.renderCalendar();
+                this.updateDefaultDueDateInputs();
             });
             
             // Add drag and drop handlers for calendar dates
@@ -3953,7 +3956,7 @@ class DailyTodoApp {
             sectionId: sectionId || null,
             dueDate: dueDate || null,
             highPriority: isHighPriority,
-            recurringTaskId: null,
+            recurringTaskId: recurringTaskId || null,
             panel: panel,
             originalColumnType: originalColumnType, // Store the original column
             deletedAt: new Date().toISOString(),
@@ -4150,7 +4153,9 @@ class DailyTodoApp {
             localStorage.setItem(`dailyTodos_${dateKey}`, JSON.stringify(todos));
             
             // Navigate to that date
-            this.setCurrentDate(originalDateObj);
+            this.currentDate = originalDateObj;
+            this.updateDateDisplay();
+            this.updateInfoSection();
             this.renderWeekView();
             this.syncCalendarToCurrentDate();
             
@@ -4162,7 +4167,7 @@ class DailyTodoApp {
             let restoreColumnType = originalColumnType || 'todo';
             
             // Create new item in the appropriate location on current date
-            const newItem = this.createTodoItem(text, null, createdAt, sectionId, itemId, dueDate, 'todo', false, recurringTaskId);
+            const newItem = this.createTodoItem(text, null, createdAt, sectionId, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
             
             // Determine which column to restore to
             let targetColumn;
@@ -6143,38 +6148,42 @@ class DailyTodoApp {
         }
         
         const daysToAdd = parseInt(setting);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Reset to start of day
+        // Use the current date in the app (not necessarily today)
+        const baseDate = new Date(this.currentDate);
+        baseDate.setHours(0, 0, 0, 0); // Reset to start of day
         
-        const dueDate = new Date(today);
-        dueDate.setDate(today.getDate() + daysToAdd);
+        const dueDate = new Date(baseDate);
+        dueDate.setDate(baseDate.getDate() + daysToAdd);
         
         return dueDate.toISOString().split('T')[0]; // Return YYYY-MM-DD format
     }
 
     updateDefaultDueDateInputs(forceUpdate = false) {
+        const setting = localStorage.getItem('defaultDueDateSetting') || 'none';
+        
+        // Skip if setting is "none" and not forcing update
+        if (setting === 'none' && !forceUpdate) {
+            return;
+        }
+        
         const defaultDueDate = this.getDefaultDueDate();
         
-        if (forceUpdate) {
-            // When called from settings change, always update regardless of current values
-            if (defaultDueDate) {
-                this.dueDateInput.value = defaultDueDate;
-                this.backburnerDueDateInput.value = defaultDueDate;
-            } else {
-                // If setting is "none", clear the inputs
-                this.dueDateInput.value = '';
-                this.backburnerDueDateInput.value = '';
-            }
-        } else {
-            // Normal behavior: only set default when inputs are empty
-            if (defaultDueDate) {
-                if (!this.dueDateInput.value) {
-                    this.dueDateInput.value = defaultDueDate;
-                }
-                if (!this.backburnerDueDateInput.value) {
-                    this.backburnerDueDateInput.value = defaultDueDate;
-                }
-            }
+        // Debug logging
+        console.log('Updating default due date inputs:', {
+            setting,
+            currentDate: this.currentDate.toISOString().split('T')[0],
+            defaultDueDate,
+            forceUpdate
+        });
+        
+        if (defaultDueDate) {
+            // Always update when navigating dates (setting !== 'none') or when forced
+            this.dueDateInput.value = defaultDueDate;
+            this.backburnerDueDateInput.value = defaultDueDate;
+        } else if (forceUpdate) {
+            // Clear inputs when forced and no default date
+            this.dueDateInput.value = '';
+            this.backburnerDueDateInput.value = '';
         }
     }
 
@@ -6707,23 +6716,29 @@ class DailyTodoApp {
         
         // Check if File System Access API is supported
         if (this.isFileSystemAccessSupported()) {
-            // Preload saved file handle for faster access
-            this.preloadAutosaveFileHandle();
+            // Preload saved file handle for faster access, but only if autosave is enabled
+            if (this.autosaveEnabled) {
+                this.preloadAutosaveFileHandle();
+            }
             
             // Get saved interval or default to 1 minute
             const savedInterval = localStorage.getItem('autosaveInterval');
             const intervalMs = savedInterval ? parseInt(savedInterval) : 60000;
             
-            // Set up autosave interval
-            this.autosaveInterval = setInterval(() => {
-                if (this.autosaveEnabled) {
-                    this.performAutosave();
-                }
-            }, intervalMs);
+            // Set up autosave interval only if enabled
+            if (this.autosaveEnabled) {
+                this.autosaveInterval = setInterval(() => {
+                    const currentlyEnabled = localStorage.getItem('autosaveEnabled') === 'true';
+                    if (currentlyEnabled) {
+                        this.performAutosave();
+                    }
+                }, intervalMs);
+            }
             
             // Also save when the page is about to unload
             window.addEventListener('beforeunload', () => {
-                if (this.autosaveEnabled && this.autosaveFileHandle) {
+                const currentlyEnabled = localStorage.getItem('autosaveEnabled') === 'true';
+                if (currentlyEnabled && this.autosaveFileHandle) {
                     this.performAutosave();
                 }
             });
@@ -6783,6 +6798,11 @@ class DailyTodoApp {
     
     async performAutosave() {
         try {
+            // First check if autosave is actually enabled
+            if (!this.autosaveEnabled || localStorage.getItem('autosaveEnabled') !== 'true') {
+                return;
+            }
+            
             // Get or create the file handle
             if (!this.autosaveFileHandle) {
                 // Check if we have a stored file handle
@@ -6790,8 +6810,9 @@ class DailyTodoApp {
                 if (savedHandle) {
                     this.autosaveFileHandle = savedHandle;
                 } else {
-                    // Auto-create file in Downloads folder instead of prompting
-                    await this.createDefaultAutosaveFile();
+                    // Don't auto-create file - just skip this autosave
+                    console.log('No autosave file selected yet');
+                    return;
                 }
             }
             
@@ -6823,34 +6844,8 @@ class DailyTodoApp {
     }
     
     async createDefaultAutosaveFile() {
-        try {
-            const options = {
-                types: [
-                    {
-                        description: 'JSON Files',
-                        accept: {
-                            'application/json': ['.json']
-                        }
-                    }
-                ],
-                suggestedName: `todo-autosave-${new Date().toISOString().split('T')[0]}.json`,
-                startIn: 'downloads'
-            };
-            
-            this.autosaveFileHandle = await window.showSaveFilePicker(options);
-            
-            // Store file handle reference for future use
-            await this.storeFileHandle(this.autosaveFileHandle);
-            
-            // Update status in settings panel
-            await this.updateAutosaveStatus();
-        } catch (error) {
-            if (error.name !== 'AbortError') {
-                console.error('Failed to create default autosave file:', error);
-                // Fall back to regular file selection if default creation fails
-                await this.selectAutosaveFile();
-            }
-        }
+        // This function is no longer used - we don't auto-prompt for file selection
+        console.log('createDefaultAutosaveFile called but no longer used');
     }
     
     async selectAutosaveFile() {

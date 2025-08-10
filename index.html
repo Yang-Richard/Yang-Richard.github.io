@@ -40,7 +40,7 @@
         <div class="main-layout">
             <div class="left-panel" id="todoPanel">
                 <div class="input-section">
-                    <textarea id="todoInput" placeholder="Enter a new todo item..." rows="3"></textarea>
+                    <textarea id="todoInput" placeholder="Enter item and press ENTER" rows="3"></textarea>
                     <div class="due-date-section">
                         <div class="date-priority-row">
                             <input type="date" id="dueDateInput">
@@ -50,8 +50,14 @@
                                 <input type="checkbox" id="highPriorityInput">
                             </label>
                         </div>
+                        <div class="destination-row">
+                            <label for="todoDestinationSelect">Add to:</label>
+                            <select id="todoDestinationSelect">
+                                <option value="unsorted" selected>New Items</option>
+                                <option value="today-todo">Today's Todo</option>
+                            </select>
+                        </div>
                     </div>
-                    <button id="addBtn">Add Todo (or press Enter)</button>
                 </div>
                 
                 <div class="unsorted-pane">
@@ -133,12 +139,29 @@
                 <div class="inline-calendar" id="inlineCalendar">
                     <div class="calendar-nav">
                         <button id="prevMonth" class="nav-btn">←</button>
-                        <span id="monthYear"></span>
+                        <span id="monthYear" class="month-year-clickable" title="Click to select date"></span>
                         <button id="nextMonth" class="nav-btn">→</button>
                     </div>
                     <div class="calendar-grid" id="calendarGrid"></div>
+                    <input type="date" id="hiddenDatePicker" style="position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0;">
                 </div>
                 
+                <!-- Pomodoro Timer UI -->
+                <div class="pomodoro-container">
+                    <div class="pomodoro-line">
+                        <div class="pomodoro-info">
+                            <span class="pomodoro-mode-text" id="pomodoroModeText">Focus:</span>
+                            <span class="pomodoro-timer" id="pomodoroTimer">25:00</span>
+                            <span class="pomodoro-session" id="pomodoroSession">1/4</span>
+                        </div>
+                        <div class="pomodoro-controls">
+                            <button id="pomodoroStart" class="pomodoro-btn pomodoro-start">▶️</button>
+                            <button id="pomodoroPause" class="pomodoro-btn pomodoro-pause" disabled>⏸️</button>
+                            <button id="pomodoroStop" class="pomodoro-btn pomodoro-stop" disabled>⏹️</button>
+                            <button id="pomodoroSkip" class="pomodoro-btn pomodoro-skip">⏭️</button>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="daily-notes-section">
                     <textarea id="dailyNotesTextarea" class="daily-notes-textarea" placeholder="Add notes for today..."></textarea>
@@ -157,7 +180,7 @@
             <!-- Hidden panels for other views -->
             <div class="left-panel hidden" id="backburnerPanel">
                 <div class="input-section">
-                    <textarea id="backburnerInput" placeholder="Enter a new item to do later..." rows="3"></textarea>
+                    <textarea id="backburnerInput" placeholder="Enter item and press ENTER" rows="3"></textarea>
                     <div class="due-date-section">
                         <div class="date-priority-row">
                             <input type="date" id="backburnerDueDateInput">
@@ -167,8 +190,13 @@
                                 <input type="checkbox" id="backburnerHighPriorityInput">
                             </label>
                         </div>
+                        <div class="destination-row">
+                            <label for="backburnerDestinationSelect">Add to:</label>
+                            <select id="backburnerDestinationSelect">
+                                <option value="unsorted" selected>Do these later</option>
+                            </select>
+                        </div>
                     </div>
-                    <button id="addBackburnerBtn">Add to Backburner</button>
                 </div>
                 
                 <div class="unsorted-pane">
@@ -371,15 +399,17 @@
                                 </div>
                                 <div class="setting-item">
                                     <label class="setting-label">Autosave interval</label>
-                                    <select id="autosaveInterval">
-                                        <option value="60000" selected>Every 1 minute</option>
-                                        <option value="600000">Every 10 minutes</option>
-                                        <option value="1800000">Every 30 minutes</option>
-                                        <option value="3600000">Every 1 hour</option>
-                                        <option value="7200000">Every 2 hours</option>
-                                        <option value="86400000">Every 24 hours</option>
-                                    </select>
-                                    <p class="setting-description">How often to automatically save your data</p>
+                                    <div class="setting-control-row">
+                                        <select id="autosaveInterval">
+                                            <option value="60000" selected>Every 1 minute</option>
+                                            <option value="600000">Every 10 minutes</option>
+                                            <option value="1800000">Every 30 minutes</option>
+                                            <option value="3600000">Every 1 hour</option>
+                                            <option value="7200000">Every 2 hours</option>
+                                            <option value="86400000">Every 24 hours</option>
+                                        </select>
+                                        <p class="setting-description">How often to automatically save your data</p>
+                                    </div>
                                 </div>
                                 <div class="setting-item">
                                     <button id="selectAutosaveFileBtn" class="settings-btn">📁 Select Autosave File Location</button>
@@ -398,46 +428,75 @@
                                 <h3>General Settings</h3>
                                 <div class="setting-item">
                                     <label class="setting-label">Skip the following days when selecting next day on Friday</label>
-                                    <select id="skipDaysSelection">
-                                        <option value="none">None (move to next calendar day)</option>
-                                        <option value="sunday">Skip Sunday only</option>
-                                        <option value="both" selected>Skip Saturday and Sunday</option>
-                                    </select>
-                                    <p class="setting-description">Controls which days to skip when moving an item forward on Friday: None goes to Saturday and Sunday, Sunday only goes to Saturday then Monday, Both goes directly to Monday</p>
+                                    <div class="setting-control-row">
+                                        <select id="skipDaysSelection">
+                                            <option value="none">None (move to next calendar day)</option>
+                                            <option value="sunday">Skip Sunday only</option>
+                                            <option value="both" selected>Skip Saturday and Sunday</option>
+                                        </select>
+                                        <p class="setting-description">Controls which days to skip when moving an item forward on Friday: None goes to Saturday and Sunday, Sunday only goes to Saturday then Monday, Both goes directly to Monday</p>
+                                    </div>
                                 </div>
                                 <div class="setting-item">
                                     <label class="setting-label">Automatically set due date for new items from today</label>
-                                    <select id="defaultDueDateSetting">
-                                        <option value="none">No due date (current behavior)</option>
-                                        <option value="1">In 1 day</option>
-                                        <option value="2">In 2 days</option>
-                                        <option value="3">In 3 days</option>
-                                        <option value="4">In 4 days</option>
-                                        <option value="5">In 5 days</option>
-                                        <option value="6">In 6 days</option>
-                                        <option value="7">In 1 week</option>
-                                        <option value="14">In 2 weeks</option>
-                                        <option value="21">In 3 weeks</option>
-                                        <option value="28">In 4 weeks</option>
-                                        <option value="35">In 5 weeks</option>
-                                        <option value="42">In 6 weeks</option>
-                                        <option value="49">In 7 weeks</option>
-                                        <option value="56">In 8 weeks</option>
-                                        <option value="63">In 9 weeks</option>
-                                        <option value="70">In 10 weeks</option>
-                                        <option value="77">In 11 weeks</option>
-                                        <option value="84">In 12 weeks</option>
-                                    </select>
-                                    <p class="setting-description">New todo and backburner items will automatically have this due date set. You can always change it manually after creation.</p>
+                                    <div class="setting-control-row">
+                                        <select id="defaultDueDateSetting">
+                                            <option value="none">No due date (current behavior)</option>
+                                            <option value="1">In 1 day</option>
+                                            <option value="2">In 2 days</option>
+                                            <option value="3">In 3 days</option>
+                                            <option value="4">In 4 days</option>
+                                            <option value="5">In 5 days</option>
+                                            <option value="6">In 6 days</option>
+                                            <option value="7">In 1 week</option>
+                                            <option value="14">In 2 weeks</option>
+                                            <option value="21">In 3 weeks</option>
+                                            <option value="28">In 4 weeks</option>
+                                            <option value="35">In 5 weeks</option>
+                                            <option value="42">In 6 weeks</option>
+                                            <option value="49">In 7 weeks</option>
+                                            <option value="56">In 8 weeks</option>
+                                            <option value="63">In 9 weeks</option>
+                                            <option value="70">In 10 weeks</option>
+                                            <option value="77">In 11 weeks</option>
+                                            <option value="84">In 12 weeks</option>
+                                        </select>
+                                        <p class="setting-description">New todo and backburner items will automatically have this due date set. You can always change it manually after creation.</p>
+                                    </div>
                                 </div>
                                 <div class="setting-item">
                                     <label class="setting-label">Show feedback messages</label>
-                                    <select id="feedbackLevel">
-                                        <option value="all">All messages</option>
-                                        <option value="important">Important only</option>
-                                        <option value="none">None</option>
-                                    </select>
-                                    <p class="setting-description">Control when success/error messages are displayed</p>
+                                    <div class="setting-control-row">
+                                        <select id="feedbackLevel">
+                                            <option value="all">All messages</option>
+                                            <option value="important">Important only</option>
+                                            <option value="none">None</option>
+                                        </select>
+                                        <p class="setting-description">Control when success/error messages are displayed</p>
+                                    </div>
+                                </div>
+                                <div class="setting-item">
+                                    <label class="setting-label">Pomodoro Settings</label>
+                                    <div class="pomodoro-settings-inline">
+                                        <div class="pomodoro-setting">
+                                            <label for="pomodoroWorkDuration">Work (min):</label>
+                                            <input type="number" id="pomodoroWorkDuration" min="1" max="999" value="25">
+                                        </div>
+                                        <div class="pomodoro-setting">
+                                            <label for="pomodoroBreakDuration">Break (min):</label>
+                                            <input type="number" id="pomodoroBreakDuration" min="1" max="999" value="5">
+                                        </div>
+                                        <div class="pomodoro-setting">
+                                            <label for="pomodoroLongBreakDuration">Long Break (min):</label>
+                                            <input type="number" id="pomodoroLongBreakDuration" min="1" max="999" value="15">
+                                        </div>
+                                        <div class="pomodoro-setting">
+                                            <label class="setting-label">
+                                                <input type="checkbox" id="pomodoroNotifications">
+                                                Enable notifications
+                                            </label>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -476,8 +535,33 @@
                                         <span class="stat-number" id="statsTrashItems">0</span>
                                         <span class="stat-label">Trash Items</span>
                                     </div>
+                                    <div class="stat-item stat-completion-rate">
+                                        <span class="stat-number" id="statsCompletionRate">0%</span>
+                                        <span class="stat-label">Completion Rate</span>
+                                    </div>
+                                    <div class="stat-item stat-most-completed">
+                                        <span class="stat-number" id="statsMostCompleted">0</span>
+                                        <span class="stat-label">Most Completed (Day)</span>
+                                    </div>
+                                    <div class="stat-item stat-average-completed">
+                                        <span class="stat-number" id="statsAverageCompleted">0</span>
+                                        <span class="stat-label">Daily Average</span>
+                                    </div>
+                                    <div class="stat-item stat-productive-day">
+                                        <span class="stat-number" id="statsProductiveDay">-</span>
+                                        <span class="stat-label">Most Productive Day</span>
+                                    </div>
+                                    <div class="stat-item stat-current-streak">
+                                        <span class="stat-number" id="statsCurrentStreak">0</span>
+                                        <span class="stat-label">Current Streak (Days)</span>
+                                    </div>
+                                    <div class="stat-item stat-active-days">
+                                        <span class="stat-number" id="statsActiveDays">0</span>
+                                        <span class="stat-label">Total Active Days</span>
+                                    </div>
                                 </div>
                             </div>
+                            
                             
                             <div class="settings-section settings-box">
                                 <h3>Data Management</h3>
@@ -541,8 +625,24 @@
                                 <button id="searchBtn" class="search-btn">Search</button>
                                 <button id="clearSearchBtn" class="search-btn">Clear</button>
                             </div>
-                            <div class="search-stats">
-                                <span id="searchResultsCount">Enter text to search...</span>
+                            <div class="search-stats-row">
+                                <div class="search-stats">
+                                    <span id="searchResultsCount">Enter text to search...</span>
+                                </div>
+                                <div class="search-filters">
+                                    <div class="search-filter-item">
+                                        <label class="search-filter-label">
+                                            <input type="checkbox" id="excludeDoneItemsFilter" checked>
+                                            <span class="search-filter-text">Exclude completed items</span>
+                                        </label>
+                                    </div>
+                                    <div class="search-filter-item">
+                                        <label class="search-filter-label">
+                                            <input type="checkbox" id="currentFutureOnlyFilter">
+                                            <span class="search-filter-text">Only show today & future items</span>
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -557,6 +657,14 @@
         </div>
     </div>
     
+    <!-- Pomodoro Completion Overlay -->
+    <div id="pomodoroCompletionOverlay" class="pomodoro-overlay hidden">
+        <div class="pomodoro-completion-content">
+            <h1 id="pomodoroCompletionTitle">Session Complete!</h1>
+            <p id="pomodoroCompletionMessage">Great work!</p>
+            <button id="pomodoroCompletionButton" class="pomodoro-completion-btn">Continue</button>
+        </div>
+    </div>
     
     <script src="src/js/wikiContent.js"></script>
     <script src="src/js/markdownParser.js"></script>

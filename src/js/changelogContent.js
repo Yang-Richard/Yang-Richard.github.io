@@ -4,6 +4,15 @@ window.ChangelogContent = {
         return `
             <br>
             <div class="changelog-entries">
+                <p><strong>v5.0 - 2025-08-10</strong></p>
+                <ul>
+                    <li>Keyboard shortcuts</li>
+                    <li>Pomodoro</li>
+                    <li>More stats</li>
+                    <li>Add items directly to today/sections</li>
+                    <li>Bug fixes </li>
+                </ul>
+                <br>
                 <p><strong>v4.1 - 2025-08-09</strong></p>
                 <ul>
                     <li>Search panel and functionality</li>

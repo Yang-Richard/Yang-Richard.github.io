@@ -2,7 +2,7 @@
 
 ## 📋 Daily Todo Kanban Board
 
-Your all-in-one productivity app for task management. Kanban board with do later and recurring sections, and notes. 
+Your all-in-one productivity app combining todo management, **all local in your browser**.
 
 ⚠️ **Beta Notice:** Some edge cases may still have minor bugs. ⚠️
 
@@ -10,10 +10,10 @@ Your all-in-one productivity app for task management. Kanban board with do later
 
 ### Try the example board!
 
-- **ADD TODOs** - Click the blue button at the top to add 200+ item examples and 2 recurring tasks.
-- **EXPLORE!** - Go to the TODO tab on the far left panel and mess around. 
-- **RESET** - Come back to the Wiki tab and clean the board.
-- **Start fresh!** - Add your own items!
+1. **ADD TODOs** - Click the blue button at the top to add 200+ item examples and 2 recurring tasks.
+2.  **EXPLORE!** - Go to the TODO tab on the far right and mess around. 
+3.  **RESET** - Come back to the Wiki tab and clean the board.
+4.  **Start fresh!** - Add your own items.
 
 ### How to use?
 
@@ -21,9 +21,9 @@ Basic workflow: Add tasks → Organize in sections → Move through To Do → In
 
 Use the sidebar icons to switch panels. Data saves automatically to your browser, and you can setup autosave to your device.
 
-## 📱 Panel on the Left
+## 📱 Panel Overview
 
-### 📋 TODO Panel
+### 📋 TODO Panel - Daily Task Management
 
 Your main productivity hub for daily tasks with a new items section and the kanban board: To Do → In Progress → Done.
 
@@ -32,8 +32,9 @@ Your main productivity hub for daily tasks with a new items section and the kanb
 - Calendar navigation to easily move between different dates, or within the week
 - Priority markers and due date color coding (red for overdue/today, yellow for tomorrow)
 - Daily Notes section for date-specific thoughts and reminders
+- Pomodoro Timer!
 
-### 🔥 BACKBURNER Panel
+### 🔥 BACKBURNER Panel - Long-Term Storage
 
 For capturing ideas, someday tasks, and non-urgent items you want to track but not work on immediately.
 
@@ -42,7 +43,7 @@ For capturing ideas, someday tasks, and non-urgent items you want to track but n
 - Same kanban workflow with To Do → In Progress → Done columns
 - Seamless item transfer back and forth with TODO panel as priorities change
 
-### 🔄 RECURRING Panel
+### 🔄 RECURRING Panel - Automated Task Management
 
 Powerful automation for repetitive work with flexible scheduling options.
 
@@ -53,7 +54,7 @@ Powerful automation for repetitive work with flexible scheduling options.
 - Date ranges to control when recurring tasks are active
 - Duplicate existing tasks to create similar ones with different settings
 
-### 🔍 SEARCH Panel
+### 🔍 SEARCH Panel - Find & Navigate Items
 
 Powerful full-text search across all your todo items regardless of panel, date, or section.
 
@@ -63,7 +64,7 @@ Powerful full-text search across all your todo items regardless of panel, date, 
 - Add copies of found items to New Items or Backburner panels
 - Easy rediscovery of forgotten tasks and project items across different days
 
-### 🗑️ TRASH Panel
+### 🗑️ TRASH Panel - Safe Deletion & Recovery
 
 Trash system organised by time since delete, and items can be recoevered
 
@@ -71,15 +72,15 @@ Trash system organised by time since delete, and items can be recoevered
 - Full metadata preservation including original dates, priorities, and sections
 - Restoration or permanent deletion option
 
-### 📝 NOTES Panel
+### 📝 NOTES Panel - General notes section for you to take notes 
 
-Persistent note-taking section for you to take your notes.
+Persistent note-taking with rich formatting capabilities through Markdown support.
 
 - Large text area for comfortable writing of longer documents and detailed notes
 - Automatic saving
 - Persistent storage that survives browser restarts
 
-### 🎨 SKETCH Panel
+### 🎨 SKETCH Panel - Digital Whiteboard
 
 An empty sketch board for you to draw in.
 
@@ -89,7 +90,7 @@ An empty sketch board for you to draw in.
 - Eraser tool
 - Automatic saving so sketches persist across browser sessions
 
-### ⚙️ SETTINGS Panel
+### ⚙️ SETTINGS Panel - Customization & Data Management
 
 App controls, statistics, and changelog. 
 
@@ -100,3 +101,25 @@ App controls, statistics, and changelog.
 - Complete JSON backup export and restore with all panels and recurring tasks
 - Bulk CSV import with recurring task ID support
 - Multiple deletion controls with undo protection and complete app reset option
+
+## ⌨️ Keyboard Shortcuts
+
+### Panel Navigation
+- **Ctrl/Cmd + 1-9**: Switch between panels instantly
+- **Ctrl/Cmd + 1**: TODO panel
+- **Ctrl/Cmd + 2**: LATER panel  
+- **Ctrl/Cmd + 3**: RECURRING panel
+- **And more...**
+
+### Date Navigation
+- **h / ←**: Previous day | **l / →**: Next day
+- **j / ↓**: Next week | **k / ↑**: Previous week
+- **t**: Jump to today
+
+### Quick Actions
+- **a**: Focus input field (ready to add items)
+- **s**: Create new section
+- **n**: Move items to next business day
+- **p**: Start/pause Pomodoro timer
+
+*Note: Shortcuts work when not typing in input fields*

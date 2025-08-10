@@ -4,11 +4,18 @@
     box-sizing: border-box;
 }
 
+html {
+    overflow-x: hidden; /* Prevent horizontal scrollbar during drag */
+    overflow-y: auto;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background-color: #f5f7fa;
     color: #333;
     line-height: 1.6;
+    overflow-x: hidden; /* Prevent horizontal scrollbar when dragging items */
+    overflow-y: auto;
 }
 
 .container {
@@ -18,6 +25,8 @@ body {
     display: flex;
     gap: 10px;
     min-height: 900px;
+    overflow-x: hidden; /* Prevent horizontal scrollbar during drag */
+    overflow-y: visible;
 }
 
 .nav-sidebar {
@@ -98,13 +107,13 @@ h1 {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 12px;
+    padding: 8px;
     color: #f8f9fa;
     background-color: #5DADE2;
     border-radius: 10px;
     border: 3px solid #3498db;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    gap: 6px;
+    gap: 4px;
 }
 
 .main-date {
@@ -112,8 +121,8 @@ h1 {
     font-weight: 700;
     text-align: center;
     line-height: 1.1;
-    margin-bottom: 8px;
-    margin-top: 10px;
+    margin-bottom: 4px;
+    margin-top: 4px;
 }
 
 .week-day-info {
@@ -138,7 +147,7 @@ h1 {
     background-color: white;
     border-radius: 10px;
     border: 1px solid #e9ecef;
-    padding: 12px;
+    padding: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     max-width: 100%;
     overflow: hidden;
@@ -374,8 +383,8 @@ h1 {
 }
 
 .week-view {
-    margin-bottom: 10px;
-    padding: 8px 0;
+    margin-bottom: 8px;
+    padding: 4px 0;
     display: flex;
     gap: 20px;
     align-items: flex-start;
@@ -388,7 +397,7 @@ h1 {
     flex: 1;
     flex-wrap: nowrap;
     justify-content: center;
-    padding: 5px 0;
+    padding: 2px 0;
 }
 
 .week-buttons {
@@ -396,15 +405,17 @@ h1 {
     justify-content: center;
     gap: 8px;
     flex-wrap: nowrap;
+    margin-left: 40px;
+    margin-right: 40px;
 }
 
 .week-day-btn {
     background-color: #ecf0f1;
     border: 2px solid #bdc3c7;
     border-radius: 8px;
-    padding: 10px 8px;
-    min-width: 85px;
-    max-width: 95px;
+    padding: 4px;
+    width: 70px;
+    height: 70px;
     cursor: pointer;
     transition: all 0.3s ease;
     text-align: center;
@@ -413,6 +424,10 @@ h1 {
     overflow: hidden;
     flex-shrink: 0;
     color: #2c3e50;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .week-day-btn:hover {
@@ -505,19 +520,25 @@ h1 {
 }
 
 .week-day-name {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
+    line-height: 1;
+    margin-bottom: 4px;
 }
 
 .week-day-date {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
+    line-height: 1;
+    margin: 1px 0;
 }
 
 .week-day-month {
     font-size: 10px;
+    line-height: 1;
+    margin-top: 4px;
 }
 
 .main-layout {
@@ -530,6 +551,8 @@ h1 {
     background-color: #f5f7fa;
     border-radius: 10px;
     padding: 10px;
+    overflow-x: hidden; /* Prevent horizontal scrollbar during drag */
+    overflow-y: visible;
 }
 
 .hidden {
@@ -741,7 +764,7 @@ h1 {
     max-width: 320px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
     height: 100%;
 }
 
@@ -784,6 +807,30 @@ h1 {
     justify-content: space-between;
 }
 
+.destination-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.destination-row label {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.destination-row select {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: white;
+    cursor: pointer;
+}
+
 .priority-toggle {
     display: flex;
     align-items: center;
@@ -807,19 +854,24 @@ h1 {
     padding: 18px 12px;
     flex: 1;
     min-height: 120px;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Make misc items full height in backburner panel */
+/* Make misc items match kanban height in backburner panel */
 #backburnerPanel .unsorted-pane {
     flex: 1;
     height: auto;
-    min-height: calc(100vh - 400px);
     display: flex;
     flex-direction: column;
 }
 
 #backburnerUnsortedItems {
     flex-grow: 1;
+    overflow-y: auto;
+    max-height: none;
+    min-height: 0;
+    padding-right: 8px;
 }
 
 .unsorted-pane h3 {
@@ -860,8 +912,8 @@ h1 {
 .data-controls {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 5px;
-    margin-top: 10px;
+    gap: 4px;
+    margin-top: 6px;
 }
 
 .control-btn {
@@ -943,8 +995,8 @@ h1 {
     display: flex;
     flex-direction: column;
     flex: 1;
-    margin-top: 5px;
-    gap: 10px;
+    margin-top: 0px;
+    gap: 5px;
 }
 
 .column-headers {
@@ -955,7 +1007,7 @@ h1 {
 
 .column-header {
     text-align: center;
-    padding-bottom: 10px;
+    padding-bottom: 6px;
     border-bottom: 3px solid #ecf0f1;
     font-size: 1.4rem;
     font-weight: bold;
@@ -1153,6 +1205,15 @@ h1 {
     width: 100%;
     height: 100%;
     flex-grow: 1;
+}
+
+/* Auto-height scrolling for unsorted sections */
+.unsorted-pane .items {
+    flex-grow: 1;
+    overflow-y: auto;
+    max-height: none;
+    min-height: 0;
+    padding-right: 8px;
 }
 
 .todo-item {
@@ -1668,6 +1729,18 @@ h1 {
     color: #2c3e50;
 }
 
+.month-year-clickable {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    user-select: none;
+}
+
+.month-year-clickable:hover {
+    background-color: #f0f0f0;
+}
+
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -2051,7 +2124,9 @@ h1 {
 /* Changelog section - fills remaining space */
 .changelog-section {
     flex: 1;
-    min-height: 500px;
+    min-height: 700px;
+    display: flex;
+    flex-direction: column;
 }
 
 
@@ -2780,10 +2855,48 @@ label.settings-btn + .setting-description {
     transform: translateY(-1px);
 }
 
+.search-stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
 .search-stats {
     color: #7f8c8d;
     font-size: 14px;
-    text-align: center;
+    flex-shrink: 0;
+}
+
+.search-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.search-filter-item {
+    display: flex;
+    align-items: center;
+}
+
+.search-filter-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #2c3e50;
+    user-select: none;
+}
+
+.search-filter-label input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.search-filter-text {
+    font-weight: 500;
 }
 
 .search-results-section {
@@ -2883,5 +2996,971 @@ label.settings-btn + .setting-description {
 .search-highlight {
     background-color: #fff3cd;
     font-weight: bold;
+}
+
+/* Pomodoro Timer Styles */
+.pomodoro-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.pomodoro-timer {
+    font-size: 48px;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-family: 'Courier New', monospace;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.pomodoro-status {
+    font-size: 18px;
+    color: #7f8c8d;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.pomodoro-session {
+    font-size: 14px;
+    color: #95a5a6;
+    margin-bottom: 20px;
+}
+
+.pomodoro-controls {
+    justify-content: right;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.pomodoro-btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pomodoro-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.pomodoro-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.pomodoro-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.pomodoro-start {
+    background-color: #27ae60;
+    color: white;
+}
+
+.pomodoro-start:hover:not(:disabled) {
+    background-color: #219a52;
+}
+
+.pomodoro-pause {
+    background-color: #f39c12;
+    color: white;
+}
+
+.pomodoro-pause:hover:not(:disabled) {
+    background-color: #d68910;
+}
+
+.pomodoro-stop {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.pomodoro-stop:hover:not(:disabled) {
+    background-color: #c0392b;
+}
+
+.pomodoro-skip {
+    background-color: #3498db;
+    color: white;
+}
+
+.pomodoro-skip:hover:not(:disabled) {
+    background-color: #2980b9;
+}
+
+.pomodoro-settings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    text-align: left;
+    border-top: 2px solid #ecf0f1;
+    padding-top: 20px;
+}
+
+.pomodoro-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+/* Override for settings inline layout */
+.pomodoro-settings-inline .pomodoro-setting {
+    flex-direction: row !important;
+}
+
+.pomodoro-setting label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #34495e;
+}
+
+.pomodoro-setting input[type="number"] {
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.pomodoro-setting input[type="number"]:focus {
+    border-color: #3498db;
+    outline: none;
+}
+
+.pomodoro-setting input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.pomodoro-active {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.pomodoro-timer.work-mode {
+    color: #27ae60;
+}
+
+.pomodoro-timer.break-mode {
+    color: #3498db;
+}
+
+.pomodoro-timer.long-break-mode {
+    color: #9b59b6;
+}
+
+/* Pomodoro Completion Overlay */
+.pomodoro-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.pomodoro-overlay.hidden {
+    display: none;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.pomodoro-completion-content {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 60px;
+    border-radius: 20px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    animation: scaleIn 0.3s ease-in-out;
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.8); }
+    to { transform: scale(1); }
+}
+
+.pomodoro-completion-content h1 {
+    font-size: 48px;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.pomodoro-completion-content p {
+    font-size: 24px;
+    margin-bottom: 40px;
+    opacity: 0.9;
+}
+
+.pomodoro-completion-btn {
+    background-color: white;
+    color: #667eea;
+    border: none;
+    padding: 15px 40px;
+    font-size: 20px;
+    font-weight: 600;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.pomodoro-completion-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* General settings alignment */
+.settings-box h3 {
+    text-align: left;
+}
+
+.settings-box .setting-item {
+    text-align: left;
+    margin-bottom: 15px;
+}
+
+.settings-box .setting-item .setting-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #2c3e50;
+}
+
+.settings-box .setting-control-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    margin-bottom: 5px;
+}
+
+.settings-box .setting-control-row select,
+.settings-box .setting-control-row input {
+    flex-shrink: 0;
+    min-width: 200px;
+}
+
+.settings-box .setting-description {
+    flex: 1;
+    margin: 0;
+    font-size: 13px;
+    color: #7f8c8d;
+    line-height: 1.4;
+}
+
+/* Pomodoro settings inline layout */
+.pomodoro-settings-inline {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.pomodoro-settings-inline .pomodoro-setting {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pomodoro-settings-inline .pomodoro-setting label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #34495e;
+    white-space: nowrap;
+    min-width: fit-content;
+}
+
+.pomodoro-settings-inline .pomodoro-setting input[type="number"] {
+    width: 60px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+    text-align: center;
+}
+
+.pomodoro-settings-inline .pomodoro-setting input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+.pomodoro-settings-inline .pomodoro-setting .setting-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    margin: 0;
+}
+
+/* Compact pomodoro UI for todo panel */
+.right-panel .pomodoro-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 4px 8px;
+    margin: 2px 0;
+    border: 1px solid #e1e8ed;
+}
+
+.right-panel .pomodoro-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    line-height: 1;
+    margin: 0;
+    min-height: 20px;
+}
+
+.right-panel .pomodoro-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 20px;
+}
+
+.right-panel .pomodoro-mode-text {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+}
+
+.right-panel .pomodoro-timer {
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+}
+
+.right-panel .pomodoro-session {
+    font-size: 12px;
+    color: #7f8c8d;
+    font-weight: 500;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+}
+
+.right-panel .pomodoro-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.right-panel .pomodoro-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 2px;
+    border: none;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.right-panel .pomodoro-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.right-panel .pomodoro-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.right-panel .pomodoro-start {
+    background-color: #27ae60;
+    color: white;
+}
+
+.right-panel .pomodoro-pause {
+    background-color: #f39c12;
+    color: white;
+}
+
+.right-panel .pomodoro-stop {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.right-panel .pomodoro-skip {
+    background-color: #3498db;
+    color: white;
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    margin: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+    background-color: #3498db;
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+/* Dark Mode Styles */
+body.dark-mode {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+}
+
+/* Container and main layout */
+body.dark-mode .container {
+    background-color: #1a1a1a;
+}
+
+body.dark-mode .main-layout {
+    background-color: #1a1a1a;
+}
+
+/* Navigation sidebar */
+body.dark-mode .nav-sidebar {
+    background-color: #2d2d2d;
+    border-right: 1px solid #444;
+}
+
+body.dark-mode .nav-sidebar-btn {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark-mode .nav-sidebar-btn:hover {
+    background-color: #4a4a4a;
+    border-color: #666;
+}
+
+body.dark-mode .nav-sidebar-btn.active {
+    background-color: #3498db;
+    color: white;
+}
+
+/* Panels */
+body.dark-mode .left-panel,
+body.dark-mode .center-section,
+body.dark-mode .center-section-backburner,
+body.dark-mode .right-panel {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+}
+
+/* Input sections */
+body.dark-mode textarea,
+body.dark-mode input[type="text"],
+body.dark-mode input[type="date"],
+body.dark-mode input[type="number"],
+body.dark-mode select {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark-mode textarea::placeholder,
+body.dark-mode input::placeholder {
+    color: #999;
+}
+
+/* Buttons */
+body.dark-mode button:not(.nav-sidebar-btn):not(.pomodoro-btn) {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark-mode button:not(.nav-sidebar-btn):not(.pomodoro-btn):hover {
+    background-color: #4a4a4a;
+    border-color: #666;
+}
+
+/* Todo items */
+body.dark-mode .todo-item {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+    color: #e0e0e0;
+}
+
+body.dark-mode .todo-item.high-priority {
+    border-color: #e74c3c;
+    box-shadow: 0 0 5px rgba(231, 76, 60, 0.3);
+}
+
+body.dark-mode .todo-item.completed {
+    background-color: #2d4a2d;
+    border-color: #4a7c59;
+}
+
+/* Unsorted pane */
+body.dark-mode .unsorted-pane {
+    background-color: #2c3e50;
+    border: 2px solid #3498db;
+}
+
+/* Column headers */
+body.dark-mode .column-header {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border-bottom: 1px solid #555;
+}
+
+/* Sections */
+body.dark-mode .section-row {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+}
+
+body.dark-mode .section-header {
+    background-color: #3a3a3a;
+    border-bottom: 1px solid #555;
+}
+
+body.dark-mode .section-title {
+    background-color: transparent;
+    color: #e0e0e0;
+    border: none;
+}
+
+/* Week buttons */
+body.dark-mode .week-day-btn {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark-mode .week-day-btn:hover {
+    background-color: #4a4a4a;
+}
+
+body.dark-mode .week-day-btn.selected {
+    background-color: #3498db;
+    color: white;
+}
+
+/* Calendar */
+body.dark-mode .calendar-grid {
+    background-color: #2d2d2d;
+}
+
+body.dark-mode .calendar-day {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark-mode .calendar-day:hover {
+    background-color: #4a4a4a;
+}
+
+body.dark-mode .calendar-day.today {
+    background-color: #3498db;
+    color: white;
+}
+
+/* Settings panel */
+body.dark-mode .settings-panel,
+body.dark-mode .settings-container {
+    background-color: #2d2d2d;
+}
+
+body.dark-mode .settings-box {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+body.dark-mode .settings-header h2 {
+    color: #e0e0e0;
+}
+
+body.dark-mode .setting-label {
+    color: #e0e0e0;
+}
+
+body.dark-mode .setting-description {
+    color: #999;
+}
+
+/* Statistics */
+body.dark-mode .stat-item {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+body.dark-mode .stat-number {
+    color: #3498db;
+}
+
+body.dark-mode .stat-label {
+    color: #e0e0e0;
+}
+
+/* Notes panel */
+body.dark-mode .notes-panel {
+    background-color: #2d2d2d;
+}
+
+body.dark-mode .notes-editor {
+    background-color: #3a3a3a;
+}
+
+body.dark-mode #notesTextarea {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+/* Sketch panel */
+body.dark-mode .sketch-panel {
+    background-color: #2d2d2d;
+}
+
+body.dark-mode .whiteboard-container {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+/* Wiki panel */
+body.dark-mode .wiki-panel {
+    background-color: #2d2d2d;
+}
+
+body.dark-mode .wiki-content {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+}
+
+/* Trash panel */
+body.dark-mode .trash-panel {
+    background-color: #2d2d2d;
+}
+
+body.dark-mode .trash-item {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+    color: #e0e0e0;
+}
+
+/* Pomodoro in dark mode */
+body.dark-mode .pomodoro-container {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+body.dark-mode .pomodoro-timer {
+    color: #e0e0e0;
+}
+
+body.dark-mode .pomodoro-status {
+    color: #999;
+}
+
+/* Tooltips in dark mode */
+body.dark-mode .tooltip {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark-mode .tooltip-content {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+/* Modal in dark mode */
+body.dark-mode .modal-content {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+}
+
+body.dark-mode .modal-header {
+    border-bottom: 1px solid #555;
+}
+
+body.dark-mode .modal-header h3 {
+    color: #e0e0e0;
+}
+
+body.dark-mode .close {
+    color: #999;
+}
+
+body.dark-mode .close:hover {
+    color: #e0e0e0;
+}
+
+/* Feedback messages in dark mode */
+body.dark-mode .feedback-message {
+    background-color: #27ae60;
+    color: white;
+    border: 1px solid #2ecc71;
+}
+
+/* Calendar in dark mode (additional styles) */
+body.dark-mode .calendar-container {
+    background-color: #2d2d2d;
+}
+
+body.dark-mode .nav-btn {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark-mode .nav-btn:hover {
+    background-color: #4a4a4a;
+}
+
+body.dark-mode .month-year-clickable {
+    color: #e0e0e0;
+}
+
+/* Recurring tasks in dark mode */
+body.dark-mode .recurring-form-section,
+body.dark-mode .center-section-recurring {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+}
+
+body.dark-mode .recurring-management-header h3 {
+    color: #e0e0e0;
+}
+
+body.dark-mode .recurring-tooltip {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark-mode .danger-btn,
+body.dark-mode .recurring-danger-btn {
+    background-color: #e74c3c;
+    color: white;
+}
+
+body.dark-mode .danger-btn:hover,
+body.dark-mode .recurring-danger-btn:hover {
+    background-color: #c0392b;
+}
+
+/* Settings buttons in dark mode */
+body.dark-mode .settings-btn {
+    background-color: #3498db;
+    color: white;
+    border: none;
+}
+
+body.dark-mode .settings-btn:hover {
+    background-color: #2980b9;
+}
+
+/* Search panel in dark mode */
+body.dark-mode .search-panel,
+body.dark-mode .search-container {
+    background-color: #2d2d2d;
+}
+
+body.dark-mode .search-input {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 2px solid #555;
+}
+
+body.dark-mode .search-results {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+
+body.dark-mode .search-filter-label {
+    color: #e0e0e0;
+}
+
+body.dark-mode .search-section {
+    background: #3a3a3a;
+    border: 1px solid #555;
+}
+
+/* Edit input in dark mode */
+body.dark-mode .edit-input {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+/* Pomodoro overlay in dark mode */
+body.dark-mode .pomodoro-overlay {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+body.dark-mode .pomodoro-completion-content {
+    background: linear-gradient(135deg, #444 0%, #666 100%);
+    color: #e0e0e0;
+}
+
+body.dark-mode .pomodoro-completion-btn {
+    background-color: #3498db;
+    color: white;
+}
+
+body.dark-mode .pomodoro-completion-btn:hover {
+    background-color: #2980b9;
+}
+
+/* Input file labels in dark mode */
+body.dark-mode input[type="file"] {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+}
+
+/* Toggle switch in dark mode */
+body.dark-mode .toggle-slider {
+    background-color: #555;
+}
+
+body.dark-mode input:checked + .toggle-slider {
+    background-color: #3498db;
+}
+
+/* Additional form elements */
+body.dark-mode input[type="checkbox"],
+body.dark-mode input[type="radio"] {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+body.dark-mode label {
+    color: #e0e0e0;
+}
+
+/* Additional white elements that need dark mode fixes */
+body.dark-mode .inline-calendar {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+}
+
+body.dark-mode .whiteboard-container {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+body.dark-mode .whiteboard-canvas {
+    background-color: #3a3a3a;
+}
+
+body.dark-mode .column {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+body.dark-mode .section-column {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+body.dark-mode .wiki-content {
+    background-color: #3a3a3a;
+}
+
+body.dark-mode .search-result-item {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+    color: #e0e0e0;
+}
+
+body.dark-mode .recurring-form-section {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+body.dark-mode .recurring-detail {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+    color: #e0e0e0;
+}
+
+body.dark-mode .center-section-recurring {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+}
+
+/* Color input styling in dark mode */
+body.dark-mode input[type="color"] {
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+}
+
+/* Toggle slider button in dark mode */
+body.dark-mode .toggle-slider:before {
+    background-color: #e0e0e0;
 }
 

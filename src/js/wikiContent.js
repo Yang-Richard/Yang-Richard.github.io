@@ -4,7 +4,7 @@ window.WikiContent = {
         return `
 # 📋 Daily Todo Kanban Board
 
-Your all-in-one productivity app combining todo management, kanban workflow, notes, sketching, and recurring tasks.
+Your all-in-one productivity app combining todo management, **all local in your browser.**
 
 ⚠️ **Beta Notice:** Some edge cases may still have minor bugs. ⚠️
 
@@ -34,6 +34,7 @@ Your main productivity hub for daily tasks with a new items section and the kanb
 - Calendar navigation to easily move between different dates, or within the week
 - Priority markers and due date color coding (red for overdue/today, yellow for tomorrow)
 - Daily Notes section for date-specific thoughts and reminders
+- Pomodoro Timer!
 
 ### 🔥 BACKBURNER Panel - Long-Term Storage
 
@@ -103,6 +104,28 @@ App controls, statistics, and changelog.
 - Bulk CSV import with recurring task ID support
 - Multiple deletion controls with undo protection and complete app reset option
 
+
+## ⌨️ Keyboard Shortcuts
+
+### Panel Navigation
+- **Ctrl/Cmd + 1-9**: Switch between panels instantly
+- **Ctrl/Cmd + 1**: TODO panel
+- **Ctrl/Cmd + 2**: LATER panel  
+- **Ctrl/Cmd + 3**: RECURRING panel
+- **And more...**
+
+### Date Navigation
+- **h / ←**: Previous day | **l / →**: Next day
+- **j / ↓**: Next week | **k / ↑**: Previous week
+- **t**: Jump to today
+
+### Quick Actions
+- **a**: Focus input field (ready to add items)
+- **s**: Create new section
+- **n**: Move items to next business day
+- **p**: Start/pause Pomodoro timer
+
+*Note: Shortcuts work when not typing in input fields*
 `;
     }
 };

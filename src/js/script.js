@@ -3,7 +3,6 @@ class DailyTodoApp {
         this.todoInput = document.getElementById('todoInput');
         this.dueDateInput = document.getElementById('dueDateInput');
         this.highPriorityInput = document.getElementById('highPriorityInput');
-        this.addBtn = document.getElementById('addBtn');
         
         this.todoItems = document.getElementById('todoItems');
         this.inProgressItems = document.getElementById('inProgressItems');
@@ -18,6 +17,7 @@ class DailyTodoApp {
         this.calendarGrid = document.getElementById('calendarGrid');
         this.prevMonthBtn = document.getElementById('prevMonth');
         this.nextMonthBtn = document.getElementById('nextMonth');
+        this.hiddenDatePicker = document.getElementById('hiddenDatePicker');
         this.undoBtn = document.getElementById('undoBtn');
         this.newSectionBtn = document.getElementById('newSectionBtn');
         this.moveKanbanBtn = document.getElementById('moveKanbanBtn');
@@ -49,6 +49,26 @@ class DailyTodoApp {
         this.showExampleBtn = document.getElementById('showExampleBtn');
         this.cleanBoardBtn = document.getElementById('cleanBoardBtn');
         
+        // Pomodoro elements
+        this.pomodoroTimer = document.getElementById('pomodoroTimer');
+        // this.pomodoroStatus = document.getElementById('pomodoroStatus'); // Removed - compact UI no longer has status display
+        this.pomodoroSession = document.getElementById('pomodoroSession');
+        this.pomodoroStart = document.getElementById('pomodoroStart');
+        this.pomodoroPause = document.getElementById('pomodoroPause');
+        this.pomodoroStop = document.getElementById('pomodoroStop');
+        this.pomodoroSkip = document.getElementById('pomodoroSkip');
+        this.pomodoroWorkDuration = document.getElementById('pomodoroWorkDuration');
+        this.pomodoroBreakDuration = document.getElementById('pomodoroBreakDuration');
+        this.pomodoroLongBreakDuration = document.getElementById('pomodoroLongBreakDuration');
+        this.pomodoroNotifications = document.getElementById('pomodoroNotifications');
+        
+        // Pomodoro completion overlay elements
+        this.pomodoroCompletionOverlay = document.getElementById('pomodoroCompletionOverlay');
+        this.pomodoroCompletionTitle = document.getElementById('pomodoroCompletionTitle');
+        this.pomodoroCompletionMessage = document.getElementById('pomodoroCompletionMessage');
+        this.pomodoroCompletionButton = document.getElementById('pomodoroCompletionButton');
+        this.pomodoroModeText = document.getElementById('pomodoroModeText');
+        
         // Panel elements
         this.todoPanel = document.getElementById('todoPanel');
         this.backburnerPanel = document.getElementById('backburnerPanel');
@@ -62,11 +82,14 @@ class DailyTodoApp {
         this.settingsPanel = document.getElementById('settingsPanel');
         this.searchPanel = document.getElementById('searchPanel');
         
+        // Destination dropdowns
+        this.todoDestinationSelect = document.getElementById('todoDestinationSelect');
+        this.backburnerDestinationSelect = document.getElementById('backburnerDestinationSelect');
+        
         // Backburner elements
         this.backburnerInput = document.getElementById('backburnerInput');
         this.backburnerDueDateInput = document.getElementById('backburnerDueDateInput');
         this.backburnerHighPriorityInput = document.getElementById('backburnerHighPriorityInput');
-        this.addBackburnerBtn = document.getElementById('addBackburnerBtn');
         this.backburnerUnsortedItems = document.getElementById('backburnerUnsortedItems');
         this.centerSectionBackburner = document.getElementById('centerSectionBackburner');
         
@@ -123,11 +146,24 @@ class DailyTodoApp {
         // Flag to prevent duplicate event listener setup
         this.settingsEventListenersAdded = false;
         
+        // Pomodoro timer state
+        this.pomodoroInterval = null;
+        this.pomodoroTimeRemaining = 25 * 60; // 25 minutes in seconds
+        this.pomodoroCurrentSession = 1;
+        this.pomodoroTotalSessions = 4;
+        this.pomodoroMode = 'work'; // 'work', 'break', 'long-break'
+        this.pomodoroIsRunning = false;
+        this.pomodoroCompletedSessions = 0; // Track completed work sessions
+        this.pomodoroIsPaused = false;
+        
+        // Auto-scroll while dragging
+        this.autoScrollInterval = null;
+        this.isNearEdge = false;
+        
         this.init();
     }
     
     init() {
-        this.addBtn.addEventListener('click', () => this.addTodo());
         this.todoInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault(); // Prevent adding new line
@@ -139,7 +175,6 @@ class DailyTodoApp {
         this.todoInput.addEventListener('input', () => this.autoResizeTextarea(this.todoInput));
         
         // Backburner event listeners
-        this.addBackburnerBtn.addEventListener('click', () => this.addBackburnerItem());
         this.backburnerInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -206,6 +241,42 @@ class DailyTodoApp {
             }
         });
         
+        // Month/year click handler for date picker
+        this.monthYearElement.addEventListener('click', (event) => {
+            // Set the date picker to current calendar date
+            const year = this.calendarDate.getFullYear();
+            const month = String(this.calendarDate.getMonth() + 1).padStart(2, '0');
+            const day = String(this.currentDate.getDate()).padStart(2, '0');
+            this.hiddenDatePicker.value = `${year}-${month}-${day}`;
+            
+            // Position the date picker near the clicked element
+            const rect = this.monthYearElement.getBoundingClientRect();
+            this.hiddenDatePicker.style.left = rect.left + 'px';
+            this.hiddenDatePicker.style.top = (rect.bottom + 5) + 'px';
+            this.hiddenDatePicker.style.position = 'fixed';
+            this.hiddenDatePicker.style.opacity = '0';
+            this.hiddenDatePicker.style.pointerEvents = 'auto';
+            this.hiddenDatePicker.style.width = '200px';
+            this.hiddenDatePicker.style.height = '40px';
+            
+            // Use showPicker() if available, otherwise focus and click
+            if (this.hiddenDatePicker.showPicker) {
+                this.hiddenDatePicker.showPicker();
+            } else {
+                this.hiddenDatePicker.focus();
+                this.hiddenDatePicker.click();
+            }
+        });
+        
+        // Date picker change handler
+        this.hiddenDatePicker.addEventListener('change', (e) => {
+            const selectedDate = new Date(e.target.value + 'T00:00:00');
+            if (!isNaN(selectedDate.getTime())) {
+                this.navigateToDate(selectedDate);
+                this.showFeedback(`Navigated to ${selectedDate.toLocaleDateString()}`, 'success');
+            }
+        });
+        
         // Navigation buttons
         this.todoNavBtn.addEventListener('click', () => this.switchPanel('todo'));
         this.backburnerNavBtn.addEventListener('click', () => this.switchPanel('backburner'));
@@ -218,6 +289,26 @@ class DailyTodoApp {
         this.searchNavBtn.addEventListener('click', () => this.switchPanel('search'));
         this.showExampleBtn.addEventListener('click', () => this.showExample());
         this.cleanBoardBtn.addEventListener('click', () => this.clearVisibleBoards());
+        
+        // Pomodoro functionality
+        this.pomodoroStart.addEventListener('click', () => this.startPomodoro());
+        this.pomodoroPause.addEventListener('click', () => this.pausePomodoro());
+        this.pomodoroStop.addEventListener('click', () => this.stopPomodoro());
+        this.pomodoroSkip.addEventListener('click', () => this.skipPomodoro());
+        this.pomodoroCompletionButton.addEventListener('click', () => this.hidePomodoroCompletionOverlay());
+        this.pomodoroWorkDuration.addEventListener('change', () => this.updatePomodoroSettings());
+        this.pomodoroWorkDuration.addEventListener('input', () => this.updatePomodoroSettings());
+        this.pomodoroBreakDuration.addEventListener('change', () => this.updatePomodoroSettings());
+        this.pomodoroBreakDuration.addEventListener('input', () => this.updatePomodoroSettings());
+        this.pomodoroLongBreakDuration.addEventListener('change', () => this.updatePomodoroSettings());
+        this.pomodoroLongBreakDuration.addEventListener('input', () => this.updatePomodoroSettings());
+        this.pomodoroNotifications.addEventListener('change', () => {
+            if (this.pomodoroNotifications.checked && 'Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+            this.savePomodoroSettings();
+            this.savePomodoroState();
+        });
         
         // Notes functionality
         this.notesTextarea.addEventListener('input', () => this.saveNotes());
@@ -245,11 +336,222 @@ class DailyTodoApp {
         // Set up autosave functionality
         this.setupAutosave();
         
+        // Add window resize listener for unsorted section heights
+        window.addEventListener('resize', () => {
+            this.updateUnsortedSectionHeights();
+        });
+        
         // Initialize counts
         this.updateAllItemCounts();
         
         // Show initial panel (wiki on first visit, last selected panel on subsequent visits)
         this.showInitialPanel();
+        
+        // Initialize keyboard shortcuts
+        this.initKeyboardShortcuts();
+        
+        // Initialize Pomodoro timer
+        this.initPomodoro();
+    }
+    
+    initKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Don't trigger shortcuts when typing in inputs or textareas
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+                return;
+            }
+            
+            // Panel navigation shortcuts (Ctrl/Cmd + Number) - work on every panel
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                switch(e.key) {
+                    case '1':
+                        e.preventDefault();
+                        this.switchPanel('todo');
+                        this.showFeedback('Switched to TODO panel', 'success');
+                        break;
+                    case '2':
+                        e.preventDefault();
+                        this.switchPanel('backburner');
+                        this.showFeedback('Switched to LATER panel', 'success');
+                        break;
+                    case '3':
+                        e.preventDefault();
+                        this.switchPanel('recurring');
+                        this.showFeedback('Switched to RECURRING panel', 'success');
+                        break;
+                    case '4':
+                        e.preventDefault();
+                        this.switchPanel('search');
+                        this.showFeedback('Switched to SEARCH panel', 'success');
+                        break;
+                    case '5':
+                        e.preventDefault();
+                        this.switchPanel('trash');
+                        this.showFeedback('Switched to TRASH panel', 'success');
+                        break;
+                    case '6':
+                        e.preventDefault();
+                        this.switchPanel('notes');
+                        this.showFeedback('Switched to NOTES panel', 'success');
+                        break;
+                    case '7':
+                        e.preventDefault();
+                        this.switchPanel('sketch');
+                        this.showFeedback('Switched to SKETCH panel', 'success');
+                        break;
+                    case '8':
+                        e.preventDefault();
+                        this.switchPanel('settings');
+                        this.showFeedback('Switched to SETTINGS panel', 'success');
+                        break;
+                    case '9':
+                        e.preventDefault();
+                        this.switchPanel('wiki');
+                        this.showFeedback('Switched to WIKI panel', 'success');
+                        break;
+                }
+            }
+            
+            // Navigation shortcuts (no modifier keys)
+            if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                // Check if we're in todo panel for arrow navigation shortcuts
+                const isTodoPanel = !this.todoPanel.classList.contains('hidden');
+                
+                switch(e.key) {
+                    case 'h':
+                        if (isTodoPanel) {
+                            e.preventDefault();
+                            this.changeDay(-1);
+                            this.showFeedback('Previous day', 'success');
+                        }
+                        break;
+                    case 'ArrowLeft':
+                        if (isTodoPanel) {
+                            e.preventDefault();
+                            this.changeDay(-1);
+                            this.showFeedback('Previous day', 'success');
+                        }
+                        break;
+                    case 'l':
+                        if (isTodoPanel) {
+                            e.preventDefault();
+                            this.changeDay(1);
+                            this.showFeedback('Next day', 'success');
+                        }
+                        break;
+                    case 'ArrowRight':
+                        if (isTodoPanel) {
+                            e.preventDefault();
+                            this.changeDay(1);
+                            this.showFeedback('Next day', 'success');
+                        }
+                        break;
+                    case 'j':
+                        if (isTodoPanel) {
+                            e.preventDefault();
+                            this.goToNextWeek();
+                            this.showFeedback('Next week', 'success');
+                        }
+                        break;
+                    case 'ArrowDown':
+                        if (isTodoPanel) {
+                            e.preventDefault();
+                            this.goToNextWeek();
+                            this.showFeedback('Next week', 'success');
+                        }
+                        break;
+                    case 'k':
+                        if (isTodoPanel) {
+                            e.preventDefault();
+                            this.goToLastWeek();
+                            this.showFeedback('Previous week', 'success');
+                        }
+                        break;
+                    case 'ArrowUp':
+                        if (isTodoPanel) {
+                            e.preventDefault();
+                            this.goToLastWeek();
+                            this.showFeedback('Previous week', 'success');
+                        }
+                        break;
+                    case 't':
+                        if (isTodoPanel) {
+                            e.preventDefault();
+                            this.goToToday();
+                            this.showFeedback('Today', 'success');
+                        }
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        this.createNewSection();
+                        break;
+                    case 'n':
+                        e.preventDefault();
+                        this.moveKanbanToNextDay();
+                        break;
+                    case 'a':
+                        e.preventDefault();
+                        // Focus on the input field for adding todos
+                        if (!this.todoPanel.classList.contains('hidden')) {
+                            this.todoInput.focus();
+                            this.showFeedback('Ready to add TODO item', 'success');
+                        } else if (!this.backburnerPanel.classList.contains('hidden')) {
+                            this.backburnerInput.focus();
+                            this.showFeedback('Ready to add LATER item', 'success');
+                        } else if (!this.recurringPanel.classList.contains('hidden')) {
+                            this.recurringTaskInput.focus();
+                            this.showFeedback('Ready to add RECURRING item', 'success');
+                        } else if (!this.searchPanel.classList.contains('hidden')) {
+                            this.searchInput.focus();
+                            this.showFeedback('Ready to search', 'success');
+                        }
+                        break;
+                    case 'p':
+                        e.preventDefault();
+                        if (this.pomodoroIsRunning) {
+                            this.pausePomodoro();
+                        } else {
+                            this.startPomodoro();
+                        }
+                        break;
+                }
+            }
+        });
+    }
+    
+    // orphaned
+    showKeyboardShortcutsHelp() {
+        const shortcuts = [
+            'Keyboard Shortcuts:',
+            '',
+            'Panel Navigation (works on all panels):',
+            '  Ctrl/Cmd + 1: TODO panel',
+            '  Ctrl/Cmd + 2: LATER panel', 
+            '  Ctrl/Cmd + 3: RECURRING panel',
+            '  Ctrl/Cmd + 4: SEARCH panel',
+            '  Ctrl/Cmd + 5: TRASH panel',
+            '  Ctrl/Cmd + 6: NOTES panel',
+            '  Ctrl/Cmd + 7: SKETCH panel',
+            '  Ctrl/Cmd + 8: SETTINGS panel',
+            '  Ctrl/Cmd + 9: WIKI panel',
+            '',
+            'Date Navigation (TODO panel only):',
+            '  h/←: Previous day',
+            '  l/→: Next day', 
+            '  j/↓: Next week',
+            '  k/↑: Previous week',
+            '  t: Go to today',
+            '',
+            'Actions:',
+            '  a: Focus input field (add item)',
+            '  s: Create new section',
+            '  n: Move items to next day',
+            '  p: Start/pause Pomodoro timer',
+            '',
+            'Note: Shortcuts work when not typing in input fields'
+        ].join('\n');
+        
+        alert(shortcuts);
     }
     
     showInitialPanel() {
@@ -273,6 +575,69 @@ class DailyTodoApp {
     updateAllItemCounts() {
         this.updateTodoItemCounts();
         this.updateBackburnerItemCounts();
+        this.updateUnsortedSectionHeights();
+    }
+    
+    updateItemCountsOnly() {
+        this.updateTodoItemCounts();
+        this.updateBackburnerItemCounts();
+    }
+    
+    updateUnsortedSectionHeights() {
+        // Update heights for both todo and backburner unsorted sections
+        this.setUnsortedSectionHeight('unsortedItems', 'kanban-board');
+        this.setUnsortedSectionHeight('backburnerUnsortedItems', 'backburnerSectionsContainer');
+    }
+    
+    setUnsortedSectionHeight(unsortedId, kanbanContainerId) {
+        const unsortedPane = document.getElementById(unsortedId)?.closest('.unsorted-pane');
+        if (!unsortedPane) return;
+        
+        // Calculate kanban board height
+        let kanbanHeight = 0;
+        
+        // For todo panel - calculate from main columns + sections
+        if (kanbanContainerId === 'kanban-board') {
+            const mainColumns = document.querySelector('.main-columns');
+            const sectionsContainer = document.getElementById('sectionsContainer');
+            
+            if (mainColumns) {
+                kanbanHeight += mainColumns.offsetHeight;
+            }
+            
+            if (sectionsContainer && sectionsContainer.children.length > 0) {
+                kanbanHeight += sectionsContainer.offsetHeight;
+            }
+            
+            // Add spacing between main columns and sections (20px from CSS)
+            if (mainColumns && sectionsContainer && sectionsContainer.children.length > 0) {
+                kanbanHeight += 20;
+            }
+        }
+        
+        // For backburner panel - calculate from sections container
+        if (kanbanContainerId === 'backburnerSectionsContainer') {
+            const backburnerSections = document.getElementById('backburnerSectionsContainer');
+            if (backburnerSections && backburnerSections.children.length > 0) {
+                kanbanHeight = backburnerSections.offsetHeight;
+            }
+        }
+        
+        // Set minimum height to screen height, then match sections if they're taller
+        const screenHeight = window.innerHeight;
+        const minHeight = Math.max(screenHeight * 0.7, 400); // Use 70% of screen height as minimum, with 400px fallback
+        const targetHeight = Math.max(kanbanHeight, minHeight);
+        
+        // Always set the height to at least screen height, or match sections if taller
+        unsortedPane.style.height = `${targetHeight}px`;
+        unsortedPane.style.maxHeight = `${targetHeight}px`;
+        
+        // Ensure scrolling is enabled for the items container
+        const itemsContainer = unsortedPane.querySelector('.items');
+        if (itemsContainer) {
+            itemsContainer.style.overflowY = 'auto';
+            itemsContainer.style.flexGrow = '1';
+        }
     }
     
     updateTodoItemCounts() {
@@ -396,6 +761,10 @@ class DailyTodoApp {
         this.settingsNavBtn.classList.remove('active');
         this.searchNavBtn.classList.remove('active');
         
+        // Reset destination dropdowns when switching panels
+        if (this.todoDestinationSelect) this.todoDestinationSelect.value = 'unsorted';
+        if (this.backburnerDestinationSelect) this.backburnerDestinationSelect.value = 'unsorted';
+        
         // Show selected panel and activate button
         switch(panelName) {
             case 'todo':
@@ -484,6 +853,7 @@ class DailyTodoApp {
         const skipDaysSelection = localStorage.getItem('skipDaysSelection');
         const feedbackLevel = localStorage.getItem('feedbackLevel');
         const defaultDueDateSetting = localStorage.getItem('defaultDueDateSetting');
+        const darkMode = localStorage.getItem('darkMode');
         
         // Set form values
         document.getElementById('autosaveEnabled').checked = autosaveEnabled === 'true';
@@ -491,6 +861,11 @@ class DailyTodoApp {
         document.getElementById('skipDaysSelection').value = skipDaysSelection || 'both';
         document.getElementById('feedbackLevel').value = feedbackLevel || 'all';
         document.getElementById('defaultDueDateSetting').value = defaultDueDateSetting || 'none';
+        // Dark mode toggle removed but dark mode functionality preserved
+        // document.getElementById('darkModeToggle').checked = darkMode === 'true';
+        
+        // Apply dark mode if enabled
+        this.applyDarkMode(darkMode === 'true');
         
         // Add event listeners only once
         if (!this.settingsEventListenersAdded) {
@@ -559,6 +934,13 @@ class DailyTodoApp {
                 this.updateDefaultDueDateInputs(true); // Force update when setting changes
             });
             
+            // Dark mode toggle removed but dark mode functionality preserved
+            // document.getElementById('darkModeToggle').addEventListener('change', (e) => {
+            //     const isDarkMode = e.target.checked;
+            //     localStorage.setItem('darkMode', isDarkMode.toString());
+            //     this.applyDarkMode(isDarkMode);
+            // });
+            
             // Add event listeners for buttons
             document.getElementById('exportAllDataBtn').addEventListener('click', () => {
                 this.exportData();
@@ -595,6 +977,9 @@ class DailyTodoApp {
     }
     
     updateStatistics() {
+        // Always update advanced stats when visiting settings (removed daily caching)
+        const shouldUpdateAdvancedStats = true;
+        
         let newItemsCount = 0;
         let miscItemsCount = 0;
         let trashItemsCount = 0;
@@ -602,6 +987,16 @@ class DailyTodoApp {
         let todoItems = 0;
         let inProgressItems = 0;
         let doneItems = 0;
+        
+        // Advanced stats (calculated daily or loaded from cache)
+        let advancedStats = {
+            mostCompleted: 0,
+            averageCompleted: 0,
+            completionRate: 0,
+            mostProductiveDay: '-',
+            currentStreak: 0,
+            activeDays: 0
+        };
         
         try {
             // Get new items (global unsorted)
@@ -648,6 +1043,10 @@ class DailyTodoApp {
             console.warn('Error parsing global items:', e);
         }
         
+        // Data for advanced statistics calculation
+        const dailyStats = {};
+        const dayOfWeekStats = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         
         // Count all daily todos and sections
         for (let i = 0; i < localStorage.length; i++) {
@@ -656,21 +1055,64 @@ class DailyTodoApp {
                 try {
                     const dayData = JSON.parse(localStorage.getItem(key));
                     if (dayData && typeof dayData === 'object') {
+                        let dayTodoItems = 0;
+                        let dayInProgressItems = 0;
+                        let dayDoneItems = 0;
+                        
                         // Count main column items
-                        if (Array.isArray(dayData.todo)) todoItems += dayData.todo.length;
-                        if (Array.isArray(dayData.inProgress)) inProgressItems += dayData.inProgress.length;
-                        if (Array.isArray(dayData.done)) doneItems += dayData.done.length;
+                        if (Array.isArray(dayData.todo)) {
+                            todoItems += dayData.todo.length;
+                            dayTodoItems += dayData.todo.length;
+                        }
+                        if (Array.isArray(dayData.inProgress)) {
+                            inProgressItems += dayData.inProgress.length;
+                            dayInProgressItems += dayData.inProgress.length;
+                        }
+                        if (Array.isArray(dayData.done)) {
+                            doneItems += dayData.done.length;
+                            dayDoneItems += dayData.done.length;
+                        }
                         
                         // Count sections and their items
                         if (dayData.sections && typeof dayData.sections === 'object') {
                             totalSections += Object.keys(dayData.sections).length;
                             Object.values(dayData.sections).forEach(section => {
                                 if (section && typeof section === 'object') {
-                                    if (Array.isArray(section.todo)) todoItems += section.todo.length;
-                                    if (Array.isArray(section.inProgress)) inProgressItems += section.inProgress.length;
-                                    if (Array.isArray(section.done)) doneItems += section.done.length;
+                                    if (Array.isArray(section.todo)) {
+                                        todoItems += section.todo.length;
+                                        dayTodoItems += section.todo.length;
+                                    }
+                                    if (Array.isArray(section.inProgress)) {
+                                        inProgressItems += section.inProgress.length;
+                                        dayInProgressItems += section.inProgress.length;
+                                    }
+                                    if (Array.isArray(section.done)) {
+                                        doneItems += section.done.length;
+                                        dayDoneItems += section.done.length;
+                                    }
                                 }
                             });
+                        }
+                        
+                        // Store daily stats for advanced calculations
+                        if (shouldUpdateAdvancedStats) {
+                            const dateKey = key.replace('dailyTodos_', '');
+                            const totalDayItems = dayTodoItems + dayInProgressItems + dayDoneItems;
+                            if (totalDayItems > 0) {
+                                // Parse date more safely - expect format YYYY-MM-DD
+                                const dateObj = new Date(dateKey + 'T00:00:00');
+                                if (!isNaN(dateObj.getTime())) {
+                                    dailyStats[dateKey] = {
+                                        completed: dayDoneItems,
+                                        total: totalDayItems,
+                                        date: dateObj
+                                    };
+                                    
+                                    // Count by day of week
+                                    const dayOfWeek = dateObj.getDay();
+                                    dayOfWeekStats[dayOfWeek] += dayDoneItems;
+                                }
+                            }
                         }
                     }
                 } catch (e) {
@@ -679,6 +1121,75 @@ class DailyTodoApp {
             }
         }
         
+        // Calculate advanced statistics (only once daily)
+        if (shouldUpdateAdvancedStats) {
+            const completedDays = Object.values(dailyStats);
+            const totalCompletedItems = completedDays.reduce((sum, day) => sum + day.completed, 0);
+            const totalTotalItems = completedDays.reduce((sum, day) => sum + day.total, 0);
+            
+            // Most items completed in a day
+            advancedStats.mostCompleted = Math.max(0, ...completedDays.map(day => day.completed));
+            
+            // Average items completed per day
+            advancedStats.averageCompleted = completedDays.length > 0 ? 
+                Math.round((totalCompletedItems / completedDays.length) * 10) / 10 : 0;
+            
+            // Completion rate percentage
+            advancedStats.completionRate = totalTotalItems > 0 ? 
+                Math.round((totalCompletedItems / totalTotalItems) * 100) : 0;
+            
+            // Most productive day of week
+            let maxProductiveDay = 0;
+            let maxProductiveCount = 0;
+            Object.entries(dayOfWeekStats).forEach(([day, count]) => {
+                if (count > maxProductiveCount) {
+                    maxProductiveCount = count;
+                    maxProductiveDay = parseInt(day);
+                }
+            });
+            advancedStats.mostProductiveDay = maxProductiveCount > 0 ? dayNames[maxProductiveDay] : '-';
+            
+            // Current streak (consecutive days with completed items)
+            const completedDaysWithItems = completedDays.filter(day => day.completed > 0);
+            const sortedCompletedDays = completedDaysWithItems
+                .sort((a, b) => b.date - a.date);
+                
+            let currentStreak = 0;
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            
+            // Check if we have any completed days
+            if (sortedCompletedDays.length > 0) {
+                // Start from today and go backwards, checking for consecutive days with completions
+                let checkDate = new Date(todayDate);
+                
+                for (let i = 0; i < 365; i++) { // Max check 365 days back
+                    checkDate.setHours(0, 0, 0, 0);
+                    
+                    const dayFound = sortedCompletedDays.find(day => {
+                        const dayDate = new Date(day.date);
+                        dayDate.setHours(0, 0, 0, 0);
+                        return dayDate.getTime() === checkDate.getTime();
+                    });
+                    
+                    if (dayFound) {
+                        currentStreak++;
+                    } else {
+                        // If we haven't found any streak yet and today has no completions, keep checking
+                        if (currentStreak > 0) {
+                            break;
+                        }
+                    }
+                    
+                    // Move to previous day
+                    checkDate.setDate(checkDate.getDate() - 1);
+                }
+            }
+            advancedStats.currentStreak = currentStreak;
+            
+            // Total active days (days with any completed items)
+            advancedStats.activeDays = completedDays.filter(day => day.completed > 0).length;
+        }
         
         // Ensure all values are numbers
         newItemsCount = parseInt(newItemsCount) || 0;
@@ -691,7 +1202,7 @@ class DailyTodoApp {
         
         const totalItems = newItemsCount + miscItemsCount + todoItems + inProgressItems + doneItems + trashItemsCount;
         
-        // Update the display
+        // Update the basic stats display
         document.getElementById('statsNewItems').textContent = newItemsCount;
         document.getElementById('statsMiscItems').textContent = miscItemsCount;
         document.getElementById('statsTotalSections').textContent = totalSections;
@@ -700,6 +1211,14 @@ class DailyTodoApp {
         document.getElementById('statsInProgressItems').textContent = inProgressItems;
         document.getElementById('statsDoneItems').textContent = doneItems;
         document.getElementById('statsTrashItems').textContent = trashItemsCount;
+        
+        // Update the advanced stats display
+        document.getElementById('statsCompletionRate').textContent = `${advancedStats.completionRate}%`;
+        document.getElementById('statsMostCompleted').textContent = advancedStats.mostCompleted;
+        document.getElementById('statsAverageCompleted').textContent = advancedStats.averageCompleted;
+        document.getElementById('statsProductiveDay').textContent = advancedStats.mostProductiveDay;
+        document.getElementById('statsCurrentStreak').textContent = advancedStats.currentStreak;
+        document.getElementById('statsActiveDays').textContent = advancedStats.activeDays;
     }
     
     clearAllDataWithConfirmation() {
@@ -1361,11 +1880,14 @@ class DailyTodoApp {
         if (savedBackburner) {
             const backburnerData = JSON.parse(savedBackburner);
             
-            // Load unsorted items
-            backburnerData.unsortedItems?.forEach(todo => {
-                const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'backburner', todo.highPriority, todo.recurringTaskId);
-                this.backburnerUnsortedItems.appendChild(item);
-            });
+            // Load unsorted items (sorted by priority)
+            if (backburnerData.unsortedItems) {
+                const sortedBackburnerUnsorted = this.sortItemsByPriority([...backburnerData.unsortedItems]);
+                sortedBackburnerUnsorted.forEach(todo => {
+                    const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'backburner', todo.highPriority, todo.recurringTaskId);
+                    this.backburnerUnsortedItems.appendChild(item);
+                });
+            }
             
             // Load sections
             if (backburnerData.sections) {
@@ -1379,19 +1901,22 @@ class DailyTodoApp {
                     setTimeout(() => {
                         const sectionElement = document.querySelector(`[data-section-id="${section.id}"]`);
                         if (sectionElement) {
-                            // Load items into sections
-                            section.todo.forEach(todo => {
+                            // Load items into sections (sorted by priority)
+                            const sortedBackburnerSectionTodos = this.sortItemsByPriority([...section.todo]);
+                            sortedBackburnerSectionTodos.forEach(todo => {
                                 const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'backburner', todo.highPriority, todo.recurringTaskId);
                                 const todoColumn = sectionElement.querySelector('.section-todo .items');
                                 if (todoColumn) todoColumn.appendChild(item);
                             });
                             
-                            section.inProgress.forEach(todo => {
+                            const sortedBackburnerSectionInProgress = this.sortItemsByPriority([...section.inProgress]);
+                            sortedBackburnerSectionInProgress.forEach(todo => {
                                 const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'backburner', todo.highPriority, todo.recurringTaskId);
                                 const inProgressColumn = sectionElement.querySelector('.section-in-progress .items');
                                 if (inProgressColumn) inProgressColumn.appendChild(item);
                             });
                             
+                            // Done items don't need priority sorting (they're all green/completed)
                             section.done.forEach(todo => {
                                 const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'backburner', todo.highPriority, todo.recurringTaskId);
                                 const doneColumn = sectionElement.querySelector('.section-done .items');
@@ -1405,15 +1930,119 @@ class DailyTodoApp {
                         sectionsProcessed++;
                         if (sectionsProcessed === sectionCount) {
                             this.updateBackburnerItemCounts();
+                            // Update heights after all sections are loaded and rendered
+                            setTimeout(() => {
+                                this.updateUnsortedSectionHeights();
+                            }, 50);
                         }
                     }, 0);
                 });
             } else {
                 // If no sections, update counters immediately for misc items
                 this.updateBackburnerItemCounts();
+                // Update heights for unsorted items only
+                setTimeout(() => {
+                    this.updateUnsortedSectionHeights();
+                }, 50);
+            }
+        } else {
+            // If no backburner data, just update heights
+            setTimeout(() => {
+                this.updateUnsortedSectionHeights();
+            }, 50);
+        }
+        
+        // Update item counts (without heights) immediately for responsive UI
+        this.updateItemCountsOnly();
+    }
+    
+    // Priority-based sorting function for todo items
+    sortItemsByPriority(items) {
+        return items.sort((a, b) => {
+            // Get priority from the todo data
+            const aPriority = this.getTodoPriorityValue(a);
+            const bPriority = this.getTodoPriorityValue(b);
+            
+            // Sort by priority: lower number = higher priority (urgent=1, high=2, medium=3, normal=4)
+            if (aPriority !== bPriority) {
+                return aPriority - bPriority;
+            }
+            
+            // If same priority, sort by creation date (newest first)
+            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+    }
+    
+    // Get numeric priority value for sorting
+    getTodoPriorityValue(todo) {
+        // High Priority (labeled as "Urgent" in UI) always comes first, regardless of due date
+        if (todo.highPriority) return 1;     // High Priority/Urgent (highest priority)
+        
+        // Check due dates for red items (overdue and due today)
+        if (todo.dueDate) {
+            const dueDate = new Date(todo.dueDate);
+            const today = new Date();
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+            
+            // Normalize dates to compare just the date part (ignore time)
+            const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+            const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const tomorrowOnly = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate());
+            
+            if (dueDateOnly.getTime() < todayOnly.getTime()) {
+                return 2;  // Overdue (red) - after urgent
+            } else if (dueDateOnly.getTime() === todayOnly.getTime()) {
+                return 3;  // Due today (red) - after overdue
+            } else if (dueDateOnly.getTime() === tomorrowOnly.getTime()) {
+                return 4;  // Due tomorrow (yellow items) - after due today
             }
         }
-        this.updateAllItemCounts();
+        
+        // Note: We can add medium priority support in the future
+        // if (todo.mediumPriority) return 4;  // Yellow (medium priority)  
+        return 5;  // White (normal priority, lowest)
+    }
+    
+    // Insert item in priority order
+    insertItemByPriority(container, newItem, todoData) {
+        const existingItems = Array.from(container.children);
+        const newPriority = this.getTodoPriorityValue(todoData);
+        
+        // Find the insertion point
+        let insertIndex = existingItems.length;
+        for (let i = 0; i < existingItems.length; i++) {
+            const existingTodo = this.getTodoDataFromItem(existingItems[i]);
+            const existingPriority = this.getTodoPriorityValue(existingTodo);
+            
+            if (newPriority < existingPriority) {
+                insertIndex = i;
+                break;
+            } else if (newPriority === existingPriority) {
+                // Same priority, sort by creation date (newer first)
+                const newDate = new Date(todoData.createdAt || 0);
+                const existingDate = new Date(existingTodo.createdAt || 0);
+                if (newDate > existingDate) {
+                    insertIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        if (insertIndex >= existingItems.length) {
+            container.appendChild(newItem);
+        } else {
+            container.insertBefore(newItem, existingItems[insertIndex]);
+        }
+    }
+    
+    // Extract todo data from DOM item (for priority comparison)
+    getTodoDataFromItem(itemElement) {
+        return {
+            highPriority: itemElement.classList.contains('high-priority') || itemElement.dataset.highPriority === 'true',
+            dueDate: itemElement.dataset.dueDate,
+            createdAt: itemElement.dataset.createdAt
+        };
     }
     
     loadTodosForDate() {
@@ -1433,19 +2062,22 @@ class DailyTodoApp {
                 Object.values(todos.sections).forEach(section => {
                     this.createSection(section.name, section.id, section.panel || 'todo');
                     
-                    // Load items into sections
-                    section.todo.forEach(todo => {
+                    // Load items into sections (sorted by priority)
+                    const sortedSectionTodos = this.sortItemsByPriority([...section.todo]);
+                    sortedSectionTodos.forEach(todo => {
                         const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
                         const sectionElement = document.querySelector(`[data-section-id="${section.id}"]`);
                         sectionElement.querySelector('.section-todo .items').appendChild(item);
                     });
                     
-                    section.inProgress.forEach(todo => {
+                    const sortedSectionInProgress = this.sortItemsByPriority([...section.inProgress]);
+                    sortedSectionInProgress.forEach(todo => {
                         const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
                         const sectionElement = document.querySelector(`[data-section-id="${section.id}"]`);
                         sectionElement.querySelector('.section-in-progress .items').appendChild(item);
                     });
                     
+                    // Done items don't need priority sorting (they're all green/completed)
                     section.done.forEach(todo => {
                         const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
                         const sectionElement = document.querySelector(`[data-section-id="${section.id}"]`);
@@ -1474,26 +2106,26 @@ class DailyTodoApp {
                 localStorage.setItem(`dailyTodos_${dateKey}`, JSON.stringify(todos));
             }
             
-            // Load main column items (only those not in sections)
-            todos.todo?.forEach(todo => {
-                if (!todo.sectionId) {
-                    const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
-                    this.todoItems.appendChild(item);
-                }
+            // Load main column items (only those not in sections) - sorted by priority
+            const mainTodos = (todos.todo || []).filter(todo => !todo.sectionId);
+            const sortedMainTodos = this.sortItemsByPriority(mainTodos);
+            sortedMainTodos.forEach(todo => {
+                const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
+                this.todoItems.appendChild(item);
             });
             
-            todos.inProgress?.forEach(todo => {
-                if (!todo.sectionId) {
-                    const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
-                    this.inProgressItems.appendChild(item);
-                }
+            const mainInProgress = (todos.inProgress || []).filter(todo => !todo.sectionId);
+            const sortedMainInProgress = this.sortItemsByPriority(mainInProgress);
+            sortedMainInProgress.forEach(todo => {
+                const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
+                this.inProgressItems.appendChild(item);
             });
             
-            todos.done?.forEach(todo => {
-                if (!todo.sectionId) {
-                    const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
-                    this.doneItems.appendChild(item);
-                }
+            // Done items don't need priority sorting (they're all green/completed)
+            const mainDone = (todos.done || []).filter(todo => !todo.sectionId);
+            mainDone.forEach(todo => {
+                const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
+                this.doneItems.appendChild(item);
             });
         }
         
@@ -1503,16 +2135,100 @@ class DailyTodoApp {
         
         // Load daily notes for this date
         this.loadDailyNotes();
+        
+        // Update destination dropdowns
+        this.populateDestinationDropdowns();
     }
     
     loadGlobalUnsortedItems() {
         const savedUnsorted = localStorage.getItem('globalUnsortedItems');
         if (savedUnsorted) {
             const unsortedItems = JSON.parse(savedUnsorted);
-            unsortedItems.forEach(todo => {
+            // Sort unsorted items by priority
+            const sortedUnsortedItems = this.sortItemsByPriority(unsortedItems);
+            sortedUnsortedItems.forEach(todo => {
                 const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
                 this.unsortedItems.appendChild(item);
             });
+        }
+    }
+    
+    populateDestinationDropdowns() {
+        this.populateTodoDestinations();
+        this.populateBackburnerDestinations();
+    }
+    
+    populateTodoDestinations() {
+        const dropdown = this.todoDestinationSelect;
+        if (!dropdown) return;
+        
+        // Store current selection
+        const currentValue = dropdown.value;
+        
+        // Clear existing options except the first two (New Items and Today's Todo)
+        while (dropdown.children.length > 2) {
+            dropdown.removeChild(dropdown.lastChild);
+        }
+        
+        // Add section options (only To Do columns)
+        const todaySections = document.querySelectorAll('.section-row[data-panel="todo"], .section-row:not([data-panel])');
+        todaySections.forEach(section => {
+            const sectionId = section.dataset.sectionId;
+            const titleElement = section.querySelector('.section-title');
+            if (titleElement && sectionId) {
+                const sectionName = titleElement.value || 'Unnamed Section';
+                
+                // Add only the To Do column option
+                const todoOption = document.createElement('option');
+                todoOption.value = `section-${sectionId}-todo`;
+                todoOption.textContent = `${sectionName}`;
+                dropdown.appendChild(todoOption);
+            }
+        });
+        
+        // Restore previous selection if it still exists, otherwise reset to default
+        if (currentValue && [...dropdown.options].some(option => option.value === currentValue)) {
+            dropdown.value = currentValue;
+        } else if (currentValue && currentValue !== 'unsorted') {
+            // If the previously selected section no longer exists, reset to 'New Items'
+            dropdown.value = 'unsorted';
+        }
+    }
+    
+    populateBackburnerDestinations() {
+        const dropdown = this.backburnerDestinationSelect;
+        if (!dropdown) return;
+        
+        // Store current selection
+        const currentValue = dropdown.value;
+        
+        // Clear existing options except the first one
+        while (dropdown.children.length > 1) {
+            dropdown.removeChild(dropdown.lastChild);
+        }
+        
+        // Add section options (only To Do columns)
+        const backburnerSections = document.querySelectorAll('.section-row[data-panel="backburner"]');
+        backburnerSections.forEach(section => {
+            const sectionId = section.dataset.sectionId;
+            const titleElement = section.querySelector('.section-title');
+            if (titleElement && sectionId) {
+                const sectionName = titleElement.value || 'Unnamed Section';
+                
+                // Add only the To Do column option
+                const todoOption = document.createElement('option');
+                todoOption.value = `section-${sectionId}-todo`;
+                todoOption.textContent = `${sectionName}`;
+                dropdown.appendChild(todoOption);
+            }
+        });
+        
+        // Restore previous selection if it still exists, otherwise reset to default
+        if (currentValue && [...dropdown.options].some(option => option.value === currentValue)) {
+            dropdown.value = currentValue;
+        } else if (currentValue && currentValue !== 'unsorted') {
+            // If the previously selected section no longer exists, reset to 'Do these later'
+            dropdown.value = 'unsorted';
         }
     }
     
@@ -1695,20 +2411,126 @@ class DailyTodoApp {
         }
     }
     
+    // Auto-scroll while dragging functionality
+    startAutoScroll(e) {
+        if (this.autoScrollInterval) return;
+        
+        const scrollThreshold = 80; // Distance from edge to start scrolling
+        const scrollSpeed = 10; // Pixels to scroll per interval
+        
+        // Store current mouse position for the interval
+        this.currentMouseY = e.clientY;
+        this.currentMouseX = e.clientX;
+        
+        this.autoScrollInterval = setInterval(() => {
+            const scrollableContainers = document.querySelectorAll('.items, body');
+            let scrolled = false;
+            
+            // Handle scrollable containers
+            scrollableContainers.forEach(container => {
+                if (container === document.body) return; // Handle body separately
+                
+                const rect = container.getBoundingClientRect();
+                const mouseY = this.currentMouseY;
+                
+                // Only scroll if mouse is within container bounds horizontally
+                if (rect.left <= this.currentMouseX && this.currentMouseX <= rect.right) {
+                    // Check if mouse is near top or bottom of container
+                    if (mouseY < rect.top + scrollThreshold && container.scrollTop > 0) {
+                        // Scroll up
+                        container.scrollTop -= scrollSpeed;
+                        scrolled = true;
+                    } else if (mouseY > rect.bottom - scrollThreshold && 
+                              container.scrollTop < container.scrollHeight - container.clientHeight) {
+                        // Scroll down
+                        container.scrollTop += scrollSpeed;
+                        scrolled = true;
+                    }
+                }
+            });
+            
+            // Handle window scrolling if no container scrolled
+            if (!scrolled) {
+                const windowHeight = window.innerHeight;
+                if (this.currentMouseY < scrollThreshold && window.pageYOffset > 0) {
+                    window.scrollBy(0, -scrollSpeed);
+                } else if (this.currentMouseY > windowHeight - scrollThreshold) {
+                    window.scrollBy(0, scrollSpeed);
+                }
+            }
+        }, 16); // ~60fps
+    }
+    
+    stopAutoScroll() {
+        if (this.autoScrollInterval) {
+            clearInterval(this.autoScrollInterval);
+            this.autoScrollInterval = null;
+        }
+    }
+    
     addTodo() {
         const text = this.todoInput.value.trim();
         if (text === '') return;
         
         const dueDate = this.dueDateInput.value || this.getDefaultDueDate();
         const isHighPriority = this.highPriorityInput.checked;
+        const destination = this.todoDestinationSelect.value;
         
         this.captureStateForUndo('add', `Add "${text}"`);
         
-        const todoItem = this.createTodoItem(text, null, null, null, null, dueDate, 'todo', isHighPriority, null);
-        this.unsortedItems.appendChild(todoItem);
+        // Handle destination selection
+        if (destination.startsWith('section-')) {
+            // Parse section destination: "section-{sectionId}-{column}"
+            // Since sectionId can contain hyphens (e.g., "section-0"), we need to be more careful
+            const match = destination.match(/^section-(.+)-todo$/);
+            if (!match) {
+                console.log(`ERROR: Could not parse destination: ${destination}`);
+                return;
+            }
+            const sectionId = match[1];
+            const column = 'todo';
+            
+            const todoItem = this.createTodoItem(text, null, null, sectionId, null, dueDate, 'todo', isHighPriority, null);
+            const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
+            
+            if (sectionElement) {
+                const targetColumn = sectionElement.querySelector('.section-todo .items');
+                if (targetColumn) {
+                    const todoData = {
+                        urgent: false,
+                        highPriority: isHighPriority,
+                        dueDate: dueDate,
+                        createdAt: new Date().toISOString()
+                    };
+                    this.insertItemByPriority(targetColumn, todoItem, todoData);
+                }
+            }
+        } else if (destination === 'today-todo') {
+            // Add to main todo column
+            const todoItem = this.createTodoItem(text, null, null, null, null, dueDate, 'todo', isHighPriority, null);
+            const todoData = {
+                urgent: false,
+                highPriority: isHighPriority,
+                dueDate: dueDate,
+                createdAt: new Date().toISOString()
+            };
+            this.insertItemByPriority(this.todoItems, todoItem, todoData);
+        } else {
+            // Default to unsorted items
+            const todoItem = this.createTodoItem(text, null, null, null, null, dueDate, 'todo', isHighPriority, null);
+            const todoData = {
+                urgent: false,
+                highPriority: isHighPriority,
+                dueDate: dueDate,
+                createdAt: new Date().toISOString()
+            };
+            this.insertItemByPriority(this.unsortedItems, todoItem, todoData);
+        }
+        
         this.todoInput.value = '';
         this.dueDateInput.value = '';
         this.highPriorityInput.checked = false;
+        // Don't reset dropdown - let it persist
         
         // Set default due date for next item
         this.updateDefaultDueDateInputs();
@@ -1720,6 +2542,8 @@ class DailyTodoApp {
         this.saveTodosForDate();
         this.updateCalendarColors();
         this.updateAllItemCounts();
+        // Ensure sections are properly updated after adding items
+        this.populateDestinationDropdowns();
     }
     
     addBackburnerItem() {
@@ -1728,14 +2552,53 @@ class DailyTodoApp {
         
         const dueDate = this.backburnerDueDateInput.value || this.getDefaultDueDate();
         const isHighPriority = this.backburnerHighPriorityInput.checked;
+        const destination = this.backburnerDestinationSelect.value;
         
         this.captureStateForUndo('add', `Add backburner "${text}"`);
         
-        const backburnerItem = this.createTodoItem(text, null, null, null, null, dueDate, 'backburner', isHighPriority, null);
-        this.backburnerUnsortedItems.appendChild(backburnerItem);
+        // Handle destination selection
+        if (destination.startsWith('section-')) {
+            // Parse section destination: "section-{sectionId}-{column}"
+            // Since sectionId can contain hyphens (e.g., "section-0"), we need to be more careful
+            const match = destination.match(/^section-(.+)-todo$/);
+            if (!match) {
+                console.log(`ERROR: Could not parse backburner destination: ${destination}`);
+                return;
+            }
+            const sectionId = match[1];
+            const column = 'todo';
+            
+            const backburnerItem = this.createTodoItem(text, null, null, sectionId, null, dueDate, 'backburner', isHighPriority, null);
+            const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
+            
+            if (sectionElement) {
+                const targetColumn = sectionElement.querySelector('.section-todo .items');
+                if (targetColumn) {
+                    const todoData = {
+                        urgent: false,
+                        highPriority: isHighPriority,
+                        dueDate: dueDate,
+                        createdAt: new Date().toISOString()
+                    };
+                    this.insertItemByPriority(targetColumn, backburnerItem, todoData);
+                }
+            }
+        } else {
+            // Default to unsorted backburner items
+            const backburnerItem = this.createTodoItem(text, null, null, null, null, dueDate, 'backburner', isHighPriority, null);
+            const todoData = {
+                urgent: false,
+                highPriority: isHighPriority,
+                dueDate: dueDate,
+                createdAt: new Date().toISOString()
+            };
+            this.insertItemByPriority(this.backburnerUnsortedItems, backburnerItem, todoData);
+        }
+        
         this.backburnerInput.value = '';
         this.backburnerDueDateInput.value = '';
         this.backburnerHighPriorityInput.checked = false;
+        // Don't reset dropdown - let it persist
         
         // Set default due date for next item
         this.updateDefaultDueDateInputs();
@@ -1746,6 +2609,8 @@ class DailyTodoApp {
         
         this.saveBackburnerItems();
         this.updateAllItemCounts();
+        // Ensure sections are properly updated after adding items
+        this.populateDestinationDropdowns();
     }
     
     createTodoItem(text, id = null, createdAt = null, sectionId = null, itemId = null, dueDate = null, panel = 'todo', isHighPriority = false, recurringTaskId = null) {
@@ -3451,6 +4316,9 @@ class DailyTodoApp {
             todoItem.classList.add('dragging');
             // Stop propagation to prevent section drag from interfering
             e.stopPropagation();
+            
+            // Start auto-scroll functionality
+            document.addEventListener('dragover', this.handleAutoScrollDragOver.bind(this));
         }
     }
     
@@ -3464,10 +4332,26 @@ class DailyTodoApp {
         document.querySelectorAll('.drag-over').forEach(element => {
             element.classList.remove('drag-over');
         });
+        
+        // Stop auto-scroll functionality
+        this.stopAutoScroll();
+        document.removeEventListener('dragover', this.handleAutoScrollDragOver.bind(this));
     }
     
     handleDragOver(e) {
         e.preventDefault();
+    }
+    
+    handleAutoScrollDragOver(e) {
+        e.preventDefault();
+        // Update mouse position for auto-scroll
+        this.currentMouseY = e.clientY;
+        this.currentMouseX = e.clientX;
+        
+        // Start auto-scroll if not already running
+        if (!this.autoScrollInterval) {
+            this.startAutoScroll(e);
+        }
     }
     
     handleDragEnter(e) {
@@ -3527,8 +4411,13 @@ class DailyTodoApp {
                 const recurringTaskId = draggedItem.dataset.recurringTaskId;
                 const newItem = this.createTodoItem(text, null, createdAt, sectionId, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
                 
-                // Replace the trash item with a proper todo item
-                itemsContainer.appendChild(newItem);
+                // Replace the trash item with a proper todo item (insert by priority)
+                const todoDataTrash = {
+                    urgent: false,  // No urgent support yet
+                    highPriority: isHighPriority,
+                    createdAt: createdAt
+                };
+                this.insertItemByPriority(itemsContainer, newItem, todoDataTrash);
                 
                 // Reapply due date styling for the new item
                 this.applyDueDateStyling(newItem);
@@ -3557,7 +4446,9 @@ class DailyTodoApp {
                 }
                 
                 
-                itemsContainer.appendChild(draggedItem);
+                // Insert by priority instead of just appending
+                const todoData = this.getTodoDataFromItem(draggedItem);
+                this.insertItemByPriority(itemsContainer, draggedItem, todoData);
                 
                 // Check if original section needs cleanup (if item came from a different section)
                 if (originalSectionId && originalSectionId !== newSectionId) {
@@ -4941,6 +5832,10 @@ class DailyTodoApp {
         });
         
         sectionsContainer.appendChild(sectionRow);
+        
+        // Update destination dropdowns when new section is created
+        this.populateDestinationDropdowns();
+        
         return sectionId;
     }
     
@@ -4981,6 +5876,9 @@ class DailyTodoApp {
                 this.saveTodosForDate();
                 this.updateCalendarColors();
             }
+            
+            // Update destination dropdowns when section title changes
+            this.populateDestinationDropdowns();
         }
     }
     
@@ -5056,6 +5954,9 @@ class DailyTodoApp {
             this.saveTodosForDate();
             this.updateAllItemCounts();
             this.showFeedback(`Deleted section "${sectionName}"`);
+            
+            // Update destination dropdowns when section is deleted
+            this.populateDestinationDropdowns();
         }
     }
     
@@ -5509,8 +6410,13 @@ class DailyTodoApp {
                 const recurringTaskId = draggedItem.dataset.recurringTaskId;
                 const newItem = this.createTodoItem(text, null, createdAt, sectionId, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
                 
-                // Replace the trash item with a proper todo item
-                itemsContainer.appendChild(newItem);
+                // Replace the trash item with a proper todo item (insert by priority)
+                const todoDataTrash = {
+                    urgent: false,  // No urgent support yet
+                    highPriority: isHighPriority,
+                    createdAt: createdAt
+                };
+                this.insertItemByPriority(itemsContainer, newItem, todoDataTrash);
                 
                 // Reapply due date styling for the new item
                 this.applyDueDateStyling(newItem);
@@ -5523,9 +6429,10 @@ class DailyTodoApp {
                 // Normal item - store original section for cleanup check
                 const originalSectionId = draggedItem.dataset.sectionId;
                 
-                // Update section ID and move
+                // Update section ID and move (insert by priority)
                 draggedItem.dataset.sectionId = sectionId;
-                itemsContainer.appendChild(draggedItem);
+                const todoData = this.getTodoDataFromItem(draggedItem);
+                this.insertItemByPriority(itemsContainer, draggedItem, todoData);
                 
                 // Check if original section needs cleanup (if moved from different section)
                 if (originalSectionId && originalSectionId !== sectionId) {
@@ -7144,6 +8051,8 @@ class DailyTodoApp {
         this.clearSearchBtn = document.getElementById('clearSearchBtn');
         this.searchResultsCount = document.getElementById('searchResultsCount');
         this.searchResults = document.getElementById('searchResults');
+        this.excludeDoneItemsFilter = document.getElementById('excludeDoneItemsFilter');
+        this.currentFutureOnlyFilter = document.getElementById('currentFutureOnlyFilter');
         
         if (this.searchInput && !this.searchInput.dataset.initialized) {
             this.searchInput.addEventListener('input', (e) => this.performSearch(e.target.value));
@@ -7169,6 +8078,25 @@ class DailyTodoApp {
             });
             this.clearSearchBtn.dataset.initialized = 'true';
         }
+        
+        // Add event listeners for filter checkboxes
+        if (this.excludeDoneItemsFilter && !this.excludeDoneItemsFilter.dataset.initialized) {
+            this.excludeDoneItemsFilter.addEventListener('change', () => {
+                if (this.searchInput.value.trim()) {
+                    this.performSearch(this.searchInput.value);
+                }
+            });
+            this.excludeDoneItemsFilter.dataset.initialized = 'true';
+        }
+        
+        if (this.currentFutureOnlyFilter && !this.currentFutureOnlyFilter.dataset.initialized) {
+            this.currentFutureOnlyFilter.addEventListener('change', () => {
+                if (this.searchInput.value.trim()) {
+                    this.performSearch(this.searchInput.value);
+                }
+            });
+            this.currentFutureOnlyFilter.dataset.initialized = 'true';
+        }
     }
     
     performSearch(searchTerm) {
@@ -7180,7 +8108,50 @@ class DailyTodoApp {
         }
         
         const results = this.searchAllItems(trimmedTerm);
-        this.displaySearchResults(results, trimmedTerm);
+        const filteredResults = this.applySearchFilters(results);
+        this.displaySearchResults(filteredResults, trimmedTerm);
+    }
+    
+    applySearchFilters(results) {
+        let filteredResults = results;
+        
+        // Apply exclude done items filter
+        if (this.excludeDoneItemsFilter && this.excludeDoneItemsFilter.checked) {
+            filteredResults = filteredResults.filter(item => item.column !== 'Done');
+        }
+        
+        // Apply current/future only filter
+        if (this.currentFutureOnlyFilter && this.currentFutureOnlyFilter.checked) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            filteredResults = filteredResults.filter(item => {
+                // Always include items without dates or with "N/A" dates
+                if (!item.originalDateKey || item.originalDateKey === 'N/A') {
+                    return true;
+                }
+                
+                try {
+                    // Handle the date key format properly (YYYY-MM-DD)
+                    const itemDate = new Date(item.originalDateKey + 'T00:00:00');
+                    
+                    // If that fails, try alternative parsing
+                    if (isNaN(itemDate.getTime())) {
+                        const itemDateAlt = new Date(item.originalDateKey);
+                        itemDateAlt.setHours(0, 0, 0, 0);
+                        return itemDateAlt >= today;
+                    }
+                    
+                    itemDate.setHours(0, 0, 0, 0);
+                    return itemDate >= today;
+                } catch (e) {
+                    // If date parsing fails, include the item
+                    return true;
+                }
+            });
+        }
+        
+        return filteredResults;
     }
     
     searchAllItems(searchTerm) {
@@ -7479,6 +8450,369 @@ class DailyTodoApp {
     clearSearchResults() {
         this.searchResultsCount.textContent = 'Enter text to search...';
         this.searchResults.innerHTML = '';
+    }
+    
+    // Pomodoro Timer Methods
+    initPomodoro() {
+        this.loadPomodoroSettings();
+        this.updatePomodoroDisplay();
+        this.updatePomodoroSession();
+        
+        // Don't request notification permission on init - only when user enables the checkbox
+    }
+    
+    loadPomodoroSettings() {
+        const savedSettings = localStorage.getItem('pomodoroSettings');
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            this.pomodoroWorkDuration.value = settings.workDuration || 25;
+            this.pomodoroBreakDuration.value = settings.breakDuration || 5;
+            this.pomodoroLongBreakDuration.value = settings.longBreakDuration || 15;
+            this.pomodoroNotifications.checked = settings.notifications === true; // Default to false
+        }
+        
+        // Load timer state if it exists, otherwise use default time based on mode
+        this.loadPomodoroState();
+        
+        // If no saved state, update the time remaining based on current mode and loaded settings
+        const savedState = localStorage.getItem('pomodoroState');
+        if (!savedState) {
+            if (this.pomodoroMode === 'work') {
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroWorkDuration.value) * 60;
+            } else if (this.pomodoroMode === 'break') {
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroBreakDuration.value) * 60;
+            } else if (this.pomodoroMode === 'long-break') {
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroLongBreakDuration.value) * 60;
+            }
+        }
+    }
+    
+    savePomodoroSettings() {
+        const settings = {
+            workDuration: parseInt(this.pomodoroWorkDuration.value),
+            breakDuration: parseInt(this.pomodoroBreakDuration.value),
+            longBreakDuration: parseInt(this.pomodoroLongBreakDuration.value),
+            notifications: this.pomodoroNotifications.checked
+        };
+        localStorage.setItem('pomodoroSettings', JSON.stringify(settings));
+    }
+    
+    savePomodoroState() {
+        const state = {
+            timeRemaining: this.pomodoroTimeRemaining,
+            currentSession: this.pomodoroCurrentSession,
+            completedSessions: this.pomodoroCompletedSessions,
+            mode: this.pomodoroMode,
+            isRunning: this.pomodoroIsRunning
+        };
+        localStorage.setItem('pomodoroState', JSON.stringify(state));
+    }
+    
+    loadPomodoroState() {
+        const savedState = localStorage.getItem('pomodoroState');
+        if (savedState) {
+            const state = JSON.parse(savedState);
+            this.pomodoroTimeRemaining = state.timeRemaining || 25 * 60;
+            this.pomodoroCurrentSession = state.currentSession || 1;
+            this.pomodoroCompletedSessions = state.completedSessions || 0;
+            this.pomodoroMode = state.mode || 'work';
+            this.pomodoroIsRunning = false; // Always start stopped after refresh
+        }
+    }
+    
+    updatePomodoroSettings() {
+        // Update the time remaining based on current mode and new settings
+        if (this.pomodoroMode === 'work') {
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroWorkDuration.value) * 60;
+        } else if (this.pomodoroMode === 'break') {
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroBreakDuration.value) * 60;
+        } else if (this.pomodoroMode === 'long-break') {
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroLongBreakDuration.value) * 60;
+        }
+        this.updatePomodoroDisplay();
+        this.savePomodoroSettings();
+        this.savePomodoroState();
+    }
+    
+    startPomodoro() {
+        this.pomodoroIsRunning = true;
+        this.pomodoroIsPaused = false;
+        
+        this.pomodoroStart.disabled = true;
+        this.pomodoroPause.disabled = false;
+        this.pomodoroStop.disabled = false;
+        this.pomodoroSkip.disabled = false;
+        
+        this.pomodoroTimer.classList.add('pomodoro-active');
+        this.updatePomodoroStatus();
+        
+        this.pomodoroInterval = setInterval(() => {
+            this.pomodoroTimeRemaining--;
+            this.updatePomodoroDisplay();
+            
+            if (this.pomodoroTimeRemaining <= 0) {
+                this.pomodoroSessionComplete();
+            }
+        }, 1000);
+        
+        this.showFeedback(`${this.pomodoroMode === 'work' ? 'Work' : 'Break'} session started!`, 'success');
+        this.savePomodoroState();
+    }
+    
+    pausePomodoro() {
+        if (this.pomodoroIsRunning) {
+            clearInterval(this.pomodoroInterval);
+            this.pomodoroIsRunning = false;
+            this.pomodoroIsPaused = true;
+            
+            this.pomodoroStart.disabled = false;
+            this.pomodoroPause.disabled = true;
+            this.pomodoroTimer.classList.remove('pomodoro-active');
+            
+            // this.pomodoroStatus.textContent = 'Paused'; // Removed - compact UI no longer has status display
+            this.showFeedback('Timer paused', 'success');
+            this.savePomodoroState();
+        }
+    }
+    
+    stopPomodoro() {
+        this.resetPomodoro();
+        this.showFeedback('Timer stopped', 'success');
+        this.savePomodoroState();
+    }
+    
+    skipPomodoro() {
+        if (this.pomodoroIsRunning) {
+            // If timer is running, skip to completion
+            clearInterval(this.pomodoroInterval);
+            this.pomodoroSessionComplete();
+            this.showFeedback('Session skipped', 'success');
+        } else {
+            // If timer is not running, advance to next session state
+            if (this.pomodoroMode === 'work') {
+                this.pomodoroCompletedSessions++;
+                if (this.pomodoroCompletedSessions % 4 === 0) {
+                    this.pomodoroMode = 'long-break';
+                    this.pomodoroTimeRemaining = parseInt(this.pomodoroLongBreakDuration.value) * 60;
+                } else {
+                    this.pomodoroMode = 'break';
+                    this.pomodoroTimeRemaining = parseInt(this.pomodoroBreakDuration.value) * 60;
+                }
+            } else {
+                this.pomodoroMode = 'work';
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroWorkDuration.value) * 60;
+                this.pomodoroCurrentSession++;
+                
+                if (this.pomodoroCurrentSession > this.pomodoroTotalSessions) {
+                    this.pomodoroCurrentSession = 1;
+                    this.pomodoroCompletedSessions = 0;
+                }
+            }
+            this.updatePomodoroDisplay();
+            this.updatePomodoroSession();
+            this.updatePomodoroStatus();
+            this.showFeedback('Advanced to next session', 'success');
+            this.savePomodoroState();
+        }
+    }
+    
+    resetPomodoro() {
+        clearInterval(this.pomodoroInterval);
+        this.pomodoroIsRunning = false;
+        this.pomodoroIsPaused = false;
+        
+        this.pomodoroStart.disabled = false;
+        this.pomodoroPause.disabled = true;
+        this.pomodoroStop.disabled = true;
+        
+        this.pomodoroTimer.classList.remove('pomodoro-active');
+        
+        if (this.pomodoroMode === 'work') {
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroWorkDuration.value) * 60;
+        } else if (this.pomodoroMode === 'break') {
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroBreakDuration.value) * 60;
+        } else if (this.pomodoroMode === 'long-break') {
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroLongBreakDuration.value) * 60;
+        }
+        
+        this.updatePomodoroDisplay();
+        this.updatePomodoroStatus();
+    }
+    
+    pomodoroSessionComplete() {
+        clearInterval(this.pomodoroInterval);
+        
+        this.showPomodoroNotification();
+        this.showPomodoroCompletionOverlay();
+        
+        if (this.pomodoroMode === 'work') {
+            // Increment completed sessions when finishing a work session
+            this.pomodoroCompletedSessions++;
+            
+            // Switch to break mode
+            if (this.pomodoroCompletedSessions % 4 === 0) {
+                // Long break after every 4th session
+                this.pomodoroMode = 'long-break';
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroLongBreakDuration.value) * 60;
+            } else {
+                // Short break
+                this.pomodoroMode = 'break';
+                this.pomodoroTimeRemaining = parseInt(this.pomodoroBreakDuration.value) * 60;
+            }
+        } else {
+            // Switch back to work mode
+            this.pomodoroMode = 'work';
+            this.pomodoroTimeRemaining = parseInt(this.pomodoroWorkDuration.value) * 60;
+            this.pomodoroCurrentSession++;
+            
+            // Reset session counter after completing all 4 sessions + breaks
+            if (this.pomodoroCurrentSession > this.pomodoroTotalSessions) {
+                this.pomodoroCurrentSession = 1;
+                this.pomodoroCompletedSessions = 0;
+            }
+        }
+        
+        this.resetPomodoro();
+        this.updatePomodoroSession();
+        this.updatePomodoroStatus();
+        this.savePomodoroState();
+    }
+    
+    showPomodoroNotification() {
+        if (this.pomodoroNotifications.checked && 'Notification' in window && Notification.permission === 'granted') {
+            let title, body;
+            
+            if (this.pomodoroMode === 'work') {
+                if (this.pomodoroCompletedSessions % 4 === 0) {
+                    title = 'Work Session Complete! 🎉';
+                    body = 'Time for a long break! You\'ve earned it.';
+                } else {
+                    title = 'Work Session Complete! ✅';
+                    body = 'Time for a short break!';
+                }
+            } else {
+                title = 'Break Complete! 💪';
+                body = 'Ready to get back to work?';
+            }
+            
+            new Notification(title, {
+                body: body,
+                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23e74c3c"/><text x="32" y="40" text-anchor="middle" fill="white" font-size="24">🍅</text></svg>'
+            });
+        }
+        
+        // Also play a sound if possible
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRvQIAABXQVZFZm10IBAAAAABAAEARAAAEAAIAP4AAAB4AQAAfgAAAQD8BAABagAuAogAhgDqAlwCBAA1AD8AVQBOAK0ApQCFAHkAfgCJAIYAhgCCAIQAggCEAIIAggCCAIQAhACCAIQAhACEAIQAggCEAIAAjADgAzYC');
+            audio.volume = 0.3;
+            audio.play().catch(() => {});
+        } catch (e) {}
+    }
+    
+    updatePomodoroDisplay() {
+        const minutes = Math.floor(this.pomodoroTimeRemaining / 60);
+        const seconds = this.pomodoroTimeRemaining % 60;
+        const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        this.pomodoroTimer.textContent = display;
+        
+        // Update timer color based on mode
+        this.pomodoroTimer.className = 'pomodoro-timer';
+        if (this.pomodoroMode === 'work') {
+            this.pomodoroTimer.classList.add('work-mode');
+        } else if (this.pomodoroMode === 'break') {
+            this.pomodoroTimer.classList.add('break-mode');
+        } else if (this.pomodoroMode === 'long-break') {
+            this.pomodoroTimer.classList.add('long-break-mode');
+        }
+        
+        if (this.pomodoroIsRunning) {
+            this.pomodoroTimer.classList.add('pomodoro-active');
+        }
+    }
+    
+    updatePomodoroStatus() {
+        let status;
+        if (this.pomodoroIsPaused) {
+            status = 'Paused';
+        } else if (this.pomodoroIsRunning) {
+            if (this.pomodoroMode === 'work') {
+                status = 'Focus time! 🎯';
+            } else if (this.pomodoroMode === 'break') {
+                status = 'Short break 😌';
+            } else if (this.pomodoroMode === 'long-break') {
+                status = 'Long break 🌴';
+            }
+        } else {
+            if (this.pomodoroMode === 'work') {
+                status = 'Ready to focus';
+            } else if (this.pomodoroMode === 'break') {
+                status = 'Break time ready';
+            } else if (this.pomodoroMode === 'long-break') {
+                status = 'Long break ready';
+            }
+        }
+        
+        // this.pomodoroStatus.textContent = status; // Removed - compact UI no longer has status display
+    }
+    
+    updatePomodoroSession() {
+        // Update the session counter (always shows current session out of total)
+        this.pomodoroSession.textContent = `${this.pomodoroCurrentSession}/${this.pomodoroTotalSessions}`;
+        
+        // Update the mode text
+        if (this.pomodoroMode === 'work') {
+            this.pomodoroModeText.textContent = 'Focus:';
+        } else if (this.pomodoroMode === 'break') {
+            this.pomodoroModeText.textContent = 'Relax:';
+        } else if (this.pomodoroMode === 'long-break') {
+            this.pomodoroModeText.textContent = 'Relax:';
+        }
+    }
+    
+    showPomodoroCompletionOverlay() {
+        let title, message;
+        
+        if (this.pomodoroMode === 'work') {
+            if (this.pomodoroCompletedSessions % 4 === 0) {
+                title = 'Work Session Complete! 🎉';
+                message = 'Amazing work! Time for a well-deserved long break.';
+            } else {
+                title = 'Work Session Complete! ✅';
+                message = 'Great job! Time for a short break.';
+            }
+        } else if (this.pomodoroMode === 'long-break') {
+            title = 'Long Break Complete! 💪';
+            message = 'You\'ve completed a full cycle! Ready for the next one?';
+        } else {
+            title = 'Break Complete! 🚀';
+            message = 'Refreshed? Let\'s get back to work!';
+        }
+        
+        this.pomodoroCompletionTitle.textContent = title;
+        this.pomodoroCompletionMessage.textContent = message;
+        this.pomodoroCompletionOverlay.classList.remove('hidden');
+        
+        // Play a sound if available
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAA8AAA=');
+            audio.play();
+        } catch (e) {
+            // Ignore audio errors
+        }
+    }
+    
+    hidePomodoroCompletionOverlay() {
+        this.pomodoroCompletionOverlay.classList.add('hidden');
+    }
+    
+    // Dark Mode Functions
+    applyDarkMode(isDarkMode) {
+        if (isDarkMode) {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
     }
 }
 

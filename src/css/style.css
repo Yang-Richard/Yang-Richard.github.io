@@ -35,6 +35,7 @@ body {
     border-radius: 0 10px 10px 0;
     display: flex;
     flex-direction: column;
+    justify-content: space-evenly;
     padding: 10px 0;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
     position: fixed;
@@ -150,7 +151,7 @@ h1 {
     padding: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     max-width: 100%;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .trash-section {
@@ -180,7 +181,7 @@ h1 {
     gap: 15px;
     flex: 1;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible;
     min-height: 400px;
     padding-bottom: 10px;
 }
@@ -211,6 +212,7 @@ h1 {
 .trash-column-items {
     flex: 1;
     overflow-y: auto;
+    overflow-x: visible;
     padding: 8px;
     min-height: 200px;
     max-height: calc(100vh - 250px);
@@ -256,11 +258,14 @@ h1 {
     background-color: #fff5f5;
     border: 1px solid #fed7d7;
     opacity: 0.8;
+    position: relative;
+    z-index: 1;
 }
 
 .trash-item:hover {
     opacity: 1;
     box-shadow: 0 2px 8px rgba(197, 48, 48, 0.2);
+    z-index: 10;
 }
 
 .trash-item .todo-text {
@@ -1227,6 +1232,7 @@ h1 {
     position: relative;
     user-select: none;
     min-height: 48px;
+    z-index: 1;
 }
 
 .todo-item.due-today {
@@ -1307,6 +1313,10 @@ h1 {
 .trash-item .tooltip,
 .trash-column .tooltip {
     z-index: 9999999 !important;
+}
+
+.trash-item:hover .tooltip {
+    z-index: 99999999 !important;
 }
 
 
@@ -1469,12 +1479,22 @@ h1 {
     grid-template-rows: repeat(2, 1fr);
     gap: 2px;
     width: 78px;
+    z-index: 100;
+}
+
+.item-actions button {
+    z-index: 100;
 }
 
 .trash-item .item-actions {
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: 1fr;
     width: 52px;
+    z-index: 50;
+}
+
+.trash-item .item-actions button {
+    z-index: 50;
 }
 
 .todo-item:hover .item-actions {
@@ -3315,6 +3335,27 @@ label.settings-btn + .setting-description {
     align-items: center;
     gap: 5px;
     font-size: 12px;
+    margin: 0;
+}
+
+/* Panel visibility controls */
+.panel-visibility-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.panel-visibility-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.panel-visibility-item input[type="checkbox"] {
     margin: 0;
 }
 

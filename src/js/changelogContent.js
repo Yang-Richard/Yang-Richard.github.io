@@ -4,7 +4,7 @@ window.ChangelogContent = {
         return `
             <br>
             <div class="changelog-entries">
-                <p><strong>v5.0 - 2025-08-10</strong></p>
+                <p><strong>v5.1 - 2025-08-10</strong></p>
                 <ul>
                     <li>Keyboard shortcuts</li>
                     <li>Pomodoro</li>

@@ -61,6 +61,9 @@ class DailyTodoApp {
         this.pomodoroBreakDuration = document.getElementById('pomodoroBreakDuration');
         this.pomodoroLongBreakDuration = document.getElementById('pomodoroLongBreakDuration');
         this.pomodoroNotifications = document.getElementById('pomodoroNotifications');
+        this.showWikiPanel = document.getElementById('showWikiPanel');
+        this.showNotesPanel = document.getElementById('showNotesPanel');
+        this.showSketchPanel = document.getElementById('showSketchPanel');
         
         // Pomodoro completion overlay elements
         this.pomodoroCompletionOverlay = document.getElementById('pomodoroCompletionOverlay');
@@ -310,6 +313,21 @@ class DailyTodoApp {
             this.savePomodoroState();
         });
         
+        this.showWikiPanel.addEventListener('change', () => {
+            this.togglePanelVisibility('wiki');
+            this.savePanelVisibilitySettings();
+        });
+        
+        this.showNotesPanel.addEventListener('change', () => {
+            this.togglePanelVisibility('notes');
+            this.savePanelVisibilitySettings();
+        });
+        
+        this.showSketchPanel.addEventListener('change', () => {
+            this.togglePanelVisibility('sketch');
+            this.savePanelVisibilitySettings();
+        });
+        
         // Notes functionality
         this.notesTextarea.addEventListener('input', () => this.saveNotes());
         this.notesTextarea.addEventListener('blur', () => this.saveNotes());
@@ -325,6 +343,7 @@ class DailyTodoApp {
         this.updateUndoButtonState();
         this.logStorageDebugInfo();
         this.updateDefaultDueDateInputs();
+        this.loadPanelVisibilitySettings();
         
         // Set up periodic trash reorganization (every 5 minutes)
         setInterval(() => {
@@ -854,6 +873,9 @@ class DailyTodoApp {
         const feedbackLevel = localStorage.getItem('feedbackLevel');
         const defaultDueDateSetting = localStorage.getItem('defaultDueDateSetting');
         const darkMode = localStorage.getItem('darkMode');
+        const showWikiPanel = localStorage.getItem('showWikiPanel');
+        const showNotesPanel = localStorage.getItem('showNotesPanel');
+        const showSketchPanel = localStorage.getItem('showSketchPanel');
         
         // Set form values
         document.getElementById('autosaveEnabled').checked = autosaveEnabled === 'true';
@@ -861,11 +883,17 @@ class DailyTodoApp {
         document.getElementById('skipDaysSelection').value = skipDaysSelection || 'both';
         document.getElementById('feedbackLevel').value = feedbackLevel || 'all';
         document.getElementById('defaultDueDateSetting').value = defaultDueDateSetting || 'none';
+        this.showWikiPanel.checked = showWikiPanel !== 'false'; // Default to true
+        this.showNotesPanel.checked = showNotesPanel !== 'false'; // Default to true
+        this.showSketchPanel.checked = showSketchPanel !== 'false'; // Default to true
         // Dark mode toggle removed but dark mode functionality preserved
         // document.getElementById('darkModeToggle').checked = darkMode === 'true';
         
         // Apply dark mode if enabled
         this.applyDarkMode(darkMode === 'true');
+        
+        // Apply panel visibility
+        this.applyPanelVisibility();
         
         // Add event listeners only once
         if (!this.settingsEventListenersAdded) {
@@ -7180,21 +7208,29 @@ class DailyTodoApp {
     }
     
     generateRecurringId() {
-        // Get existing recurring tasks to find the highest ID number
-        const recurringTasks = JSON.parse(localStorage.getItem('recurringTasks') || '[]');
-        let maxId = 0;
+        // Get the current counter from localStorage, or find the highest existing ID
+        let counter = parseInt(localStorage.getItem('recurringIdCounter') || '0');
         
-        recurringTasks.forEach(task => {
-            // Extract number from IDs like "Recurring 1", "Recurring 2", etc.
-            const match = task.id.match(/Recurring (\d+)/);
-            if (match) {
-                const num = parseInt(match[1]);
-                if (num > maxId) maxId = num;
-            }
-        });
+        // On first run or if counter is missing, find the highest existing ID
+        if (counter === 0) {
+            const recurringTasks = JSON.parse(localStorage.getItem('recurringTasks') || '[]');
+            
+            recurringTasks.forEach(task => {
+                // Extract number from IDs like "Recurring 1", "Recurring 2", etc.
+                const match = task.id.match(/Recurring (\d+)/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > counter) counter = num;
+                }
+            });
+        }
+        
+        // Increment counter and save it
+        counter++;
+        localStorage.setItem('recurringIdCounter', counter.toString());
         
         // Return the next sequential ID
-        return `Recurring ${maxId + 1}`;
+        return `Recurring ${counter}`;
     }
 
     createRecurringTask() {
@@ -8497,6 +8533,65 @@ class DailyTodoApp {
         localStorage.setItem('pomodoroSettings', JSON.stringify(settings));
     }
     
+    loadPanelVisibilitySettings() {
+        const showWikiPanel = localStorage.getItem('showWikiPanel');
+        const showNotesPanel = localStorage.getItem('showNotesPanel');
+        const showSketchPanel = localStorage.getItem('showSketchPanel');
+        
+        this.showWikiPanel.checked = showWikiPanel !== 'false'; // Default to true
+        this.showNotesPanel.checked = showNotesPanel !== 'false'; // Default to true
+        this.showSketchPanel.checked = showSketchPanel !== 'false'; // Default to true
+        
+        this.applyPanelVisibility();
+    }
+    
+    savePanelVisibilitySettings() {
+        localStorage.setItem('showWikiPanel', this.showWikiPanel.checked.toString());
+        localStorage.setItem('showNotesPanel', this.showNotesPanel.checked.toString());
+        localStorage.setItem('showSketchPanel', this.showSketchPanel.checked.toString());
+    }
+    
+    togglePanelVisibility(panelType) {
+        const navBtns = {
+            wiki: this.wikiNavBtn,
+            notes: this.notesNavBtn,
+            sketch: this.sketchNavBtn
+        };
+        
+        const panels = {
+            wiki: this.wikiPanel,
+            notes: this.notesPanel,
+            sketch: this.sketchPanel
+        };
+        
+        const checkboxes = {
+            wiki: this.showWikiPanel,
+            notes: this.showNotesPanel,
+            sketch: this.showSketchPanel
+        };
+        
+        const navBtn = navBtns[panelType];
+        const panel = panels[panelType];
+        const checkbox = checkboxes[panelType];
+        
+        if (checkbox.checked) {
+            navBtn.style.display = 'block';
+        } else {
+            navBtn.style.display = 'none';
+            // If currently on this panel, switch to todo panel
+            if (!panel.classList.contains('hidden')) {
+                this.switchPanel('todo');
+            }
+        }
+    }
+    
+    applyPanelVisibility() {
+        this.togglePanelVisibility('wiki');
+        this.togglePanelVisibility('notes');
+        this.togglePanelVisibility('sketch');
+        // Settings panel is always visible - no toggle needed
+    }
+    
     savePomodoroState() {
         const state = {
             timeRemaining: this.pomodoroTimeRemaining,
@@ -8701,12 +8796,12 @@ class DailyTodoApp {
             });
         }
         
-        // Also play a sound if possible
-        try {
-            const audio = new Audio('data:audio/wav;base64,UklGRvQIAABXQVZFZm10IBAAAAABAAEARAAAEAAIAP4AAAB4AQAAfgAAAQD8BAABagAuAogAhgDqAlwCBAA1AD8AVQBOAK0ApQCFAHkAfgCJAIYAhgCCAIQAggCEAIIAggCCAIQAhACCAIQAhACEAIQAggCEAIAAjADgAzYC');
-            audio.volume = 0.3;
-            audio.play().catch(() => {});
-        } catch (e) {}
+        // Audio events disabled
+        // try {
+        //     const audio = new Audio('data:audio/wav;base64,UklGRvQIAABXQVZFZm10IBAAAAABAAEARAAAEAAIAP4AAAB4AQAAfgAAAQD8BAABagAuAogAhgDqAlwCBAA1AD8AVQBOAK0ApQCFAHkAfgCJAIYAhgCCAIQAggCEAIIAggCCAIQAhACCAIQAhACEAIQAggCEAIAAjADgAzYC');
+        //     audio.volume = 0.3;
+        //     audio.play().catch(() => {});
+        // } catch (e) {}
     }
     
     updatePomodoroDisplay() {
@@ -8793,13 +8888,13 @@ class DailyTodoApp {
         this.pomodoroCompletionMessage.textContent = message;
         this.pomodoroCompletionOverlay.classList.remove('hidden');
         
-        // Play a sound if available
-        try {
-            const audio = new Audio('data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAA8AAA=');
-            audio.play();
-        } catch (e) {
-            // Ignore audio errors
-        }
+        // Audio events disabled
+        // try {
+        //     const audio = new Audio('data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAA8AAA=');
+        //     audio.play();
+        // } catch (e) {
+        //     // Ignore audio errors
+        // }
     }
     
     hidePomodoroCompletionOverlay() {

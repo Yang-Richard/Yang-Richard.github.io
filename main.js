@@ -23,7 +23,8 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, 'preload.js'),
+            webSecurity: true // Allow loading external fonts
         },
         icon: path.join(__dirname, 'build/icon.ico'), // You'll need to add an icon
         show: false

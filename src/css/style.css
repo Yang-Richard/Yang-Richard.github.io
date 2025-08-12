@@ -10,7 +10,7 @@ html {
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol";
     background-color: #f5f7fa;
     color: #333;
     line-height: 1.6;
@@ -2765,6 +2765,7 @@ label.settings-btn + .setting-description {
     height: 30px;
     text-align: center;
     font-weight: normal;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
 }
 
 /* Bold emoji for urgent recurring items with red background */

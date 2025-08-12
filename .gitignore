@@ -25,3 +25,10 @@ CLAUDE.md
 Dockerfile
 BUGS.md
 notes.md
+
+# Electron specific
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

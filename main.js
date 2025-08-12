@@ -1,6 +1,15 @@
 const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 
+// Fix for GPU process errors (especially on Linux/WSL)
+if (process.platform === 'linux') {
+    app.commandLine.appendSwitch('disable-gpu');
+    app.commandLine.appendSwitch('disable-software-rasterizer');
+}
+// Optional: uncomment these if you still see GPU errors
+// app.commandLine.appendSwitch('disable-gpu-sandbox');
+// app.commandLine.appendSwitch('no-sandbox');
+
 let mainWindow;
 let isDev = process.argv.includes('--dev');
 

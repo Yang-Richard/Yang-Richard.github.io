@@ -19,7 +19,7 @@ body {
 }
 
 .container {
-    max-width: 1800px;
+    max-width: none;
     margin: 0 auto;
     padding: 10px 10px 10px 0;
     display: flex;
@@ -764,8 +764,8 @@ h1 {
 
 .right-panel {
     width: 320px;
-    flex-shrink: 1;
-    min-width: 200px;
+    flex-shrink: 0;
+    min-width: 320px;
     max-width: 320px;
     display: flex;
     flex-direction: column;

@@ -3246,7 +3246,7 @@ class DailyTodoApp {
             
             const exportData = {
                 exportDate: new Date().toISOString(),
-                version: '1.5',
+                version: '6.0',
                 data: allData,
                 dailyNotes: dailyNotes,
                 globalUnsortedItems: globalUnsorted ? JSON.parse(globalUnsorted) : [],
@@ -8080,7 +8080,7 @@ class DailyTodoApp {
         
         return {
             exportDate: new Date().toISOString(),
-            version: '1.5',
+            version: '6.0',
             autosave: true,
             data: allData,
             dailyNotes: dailyNotes,

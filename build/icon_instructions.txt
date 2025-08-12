@@ -1,0 +1,14 @@
+To add an icon for your Electron app:
+
+1. Create or obtain a 256x256 pixel icon for your app
+2. Save it as icon.png in this build directory
+3. Convert it to .ico format for Windows (you can use online converters)
+4. Name the Windows icon file: icon.ico
+
+Recommended icon sizes for Windows:
+- 16x16
+- 32x32
+- 48x48
+- 256x256
+
+The .ico file should contain all these sizes for best results.

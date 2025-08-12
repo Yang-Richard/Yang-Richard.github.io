@@ -3246,7 +3246,7 @@ class DailyTodoApp {
             
             const exportData = {
                 exportDate: new Date().toISOString(),
-                version: '1.5',
+                version: '6.0',
                 data: allData,
                 dailyNotes: dailyNotes,
                 globalUnsortedItems: globalUnsorted ? JSON.parse(globalUnsorted) : [],
@@ -7681,15 +7681,20 @@ class DailyTodoApp {
     }
     
     setupAutosave() {
-        // Initialize autosave file handle
-        this.autosaveFileHandle = null;
+        // Initialize autosave properties
+        this.autosaveFileHandle = null; // For browser mode
+        this.autosaveFilePath = null;   // For Electron mode
         this.autosaveEnabled = localStorage.getItem('autosaveEnabled') === 'true';
         
         // Check if File System Access API is supported
         if (this.isFileSystemAccessSupported()) {
-            // Preload saved file handle for faster access, but only if autosave is enabled
+            // Preload saved file handle/path for faster access, but only if autosave is enabled
             if (this.autosaveEnabled) {
-                this.preloadAutosaveFileHandle();
+                if (this.isElectronMode()) {
+                    this.preloadAutosaveFilePath();
+                } else {
+                    this.preloadAutosaveFileHandle();
+                }
             }
             
             // Get saved interval or default to 1 minute
@@ -7757,9 +7762,17 @@ class DailyTodoApp {
         this.autosaveEnabled = isEnabled;
     }
     
+    isElectronMode() {
+        return window.electronAPI && typeof window.electronAPI.selectSaveFile === 'function';
+    }
+
     isFileSystemAccessSupported() {
-        // Check for the File System Access API
-        // Works in Chrome, Edge, Brave, and Firefox (with origin trial or flag)
+        // Check for Electron API first, then fall back to File System Access API
+        if (this.isElectronMode()) {
+            return true; // Electron API available
+        }
+        
+        // Check for the File System Access API (browser)
         const supported = 'showSaveFilePicker' in window && 
                          'showOpenFilePicker' in window && 
                          'showDirectoryPicker' in window;
@@ -7774,36 +7787,61 @@ class DailyTodoApp {
                 return;
             }
             
-            // Get or create the file handle
-            if (!this.autosaveFileHandle) {
-                // Check if we have a stored file handle
-                const savedHandle = await this.getStoredFileHandle();
-                if (savedHandle) {
-                    this.autosaveFileHandle = savedHandle;
-                } else {
-                    // Don't auto-create file - just skip this autosave
-                    console.log('No autosave file selected yet');
-                    return;
+            // Get or create the file handle/path based on the environment
+            if (this.isElectronMode()) {
+                // Electron mode - use file path
+                if (!this.autosaveFilePath) {
+                    const savedPath = await window.electronAPI.getStoredFilePath();
+                    if (savedPath) {
+                        this.autosaveFilePath = savedPath;
+                    } else {
+                        console.log('No autosave file selected yet');
+                        return;
+                    }
+                }
+            } else {
+                // Browser mode - use file handle
+                if (!this.autosaveFileHandle) {
+                    const savedHandle = await this.getStoredFileHandle();
+                    if (savedHandle) {
+                        this.autosaveFileHandle = savedHandle;
+                    } else {
+                        console.log('No autosave file selected yet');
+                        return;
+                    }
                 }
             }
             
-            if (this.autosaveFileHandle) {
-                // Prepare export data
-                const exportData = this.prepareExportData();
-                const jsonString = JSON.stringify(exportData, null, 2);
-                
-                // Write to file
-                const writable = await this.autosaveFileHandle.createWritable();
-                await writable.write(jsonString);
-                await writable.close();
-                
-                this.showFeedback('Autosaved to file', 'success');
-                
-                // Store last autosave time
-                localStorage.setItem('lastAutosaveTime', new Date().toISOString());
-                await this.updateAutosaveStatus();
-
-                console.log("Autosaved: ", new Date().toISOString());
+            // Prepare export data
+            const exportData = this.prepareExportData();
+            const jsonString = JSON.stringify(exportData, null, 2);
+            
+            if (this.isElectronMode()) {
+                // Electron mode - use file path
+                if (this.autosaveFilePath) {
+                    const result = await window.electronAPI.saveToFile(this.autosaveFilePath, jsonString);
+                    if (result.success) {
+                        this.showFeedback('Autosaved to file', 'success');
+                        localStorage.setItem('lastAutosaveTime', new Date().toISOString());
+                        await this.updateAutosaveStatus();
+                        console.log("Autosaved: ", new Date().toISOString());
+                    } else {
+                        console.error('Autosave failed:', result.error);
+                        this.showFeedback('Autosave failed: ' + result.error, 'error');
+                    }
+                }
+            } else {
+                // Browser mode - use file handle
+                if (this.autosaveFileHandle) {
+                    const writable = await this.autosaveFileHandle.createWritable();
+                    await writable.write(jsonString);
+                    await writable.close();
+                    
+                    this.showFeedback('Autosaved to file', 'success');
+                    localStorage.setItem('lastAutosaveTime', new Date().toISOString());
+                    await this.updateAutosaveStatus();
+                    console.log("Autosaved: ", new Date().toISOString());
+                }
             }
         } catch (error) {
             console.error('Autosave failed:', error);
@@ -7820,32 +7858,47 @@ class DailyTodoApp {
     
     async selectAutosaveFile() {
         try {
-            const options = {
-                types: [
-                    {
-                        description: 'JSON Files',
-                        accept: {
-                            'application/json': ['.json']
+            if (this.isElectronMode()) {
+                // Electron mode - use file dialog
+                const filePath = await window.electronAPI.selectSaveFile();
+                if (filePath) {
+                    this.autosaveFilePath = filePath;
+                    await window.electronAPI.setStoredFilePath(filePath);
+                    this.showFeedback('Autosave file selected successfully');
+                    await this.updateAutosaveStatus();
+                } else {
+                    throw new Error('No file selected');
+                }
+            } else {
+                // Browser mode - use File System Access API
+                const options = {
+                    types: [
+                        {
+                            description: 'JSON Files',
+                            accept: {
+                                'application/json': ['.json']
+                            }
                         }
-                    }
-                ],
-                suggestedName: `todo-autosave-${new Date().toISOString().split('T')[0]}.json`
-            };
-            
-            this.autosaveFileHandle = await window.showSaveFilePicker(options);
-            
-            // Store file handle reference for future use
-            await this.storeFileHandle(this.autosaveFileHandle);
-            
-            this.showFeedback('Autosave file selected successfully');
-            
-            // Update status in settings panel
-            await this.updateAutosaveStatus();
+                    ],
+                    suggestedName: `todo-autosave-${new Date().toISOString().split('T')[0]}.json`
+                };
+                
+                this.autosaveFileHandle = await window.showSaveFilePicker(options);
+                
+                // Store file handle reference for future use
+                await this.storeFileHandle(this.autosaveFileHandle);
+                
+                this.showFeedback('Autosave file selected successfully');
+                
+                // Update status in settings panel
+                await this.updateAutosaveStatus();
+            }
         } catch (error) {
             if (error.name !== 'AbortError') {
                 console.error('Failed to select autosave file:', error);
                 this.showFeedback('Failed to select autosave file', 'error');
             }
+            throw error; // Re-throw to handle in calling code
         }
     }
     
@@ -7930,26 +7983,61 @@ class DailyTodoApp {
     }
     
     async clearAutosaveFileHandle() {
-        // Clear autosave file handle from IndexedDB
+        // Clear autosave file handle/path based on mode
         try {
-            const db = await this.openAutosaveDB();
-            const transaction = db.transaction(['fileHandles'], 'readwrite');
-            const store = transaction.objectStore('fileHandles');
-            const request = store.delete('autosaveHandle');
-            
-            return new Promise((resolve, reject) => {
-                request.onsuccess = () => {
-                    console.log('Autosave file handle cleared from IndexedDB');
-                    resolve();
-                };
-                request.onerror = () => {
-                    console.error('Error clearing autosave file handle:', request.error);
-                    reject(request.error);
-                };
-            });
+            if (this.isElectronMode()) {
+                // Clear file path in Electron
+                await window.electronAPI.clearStoredFilePath();
+                this.autosaveFilePath = null;
+                console.log('Autosave file path cleared from Electron storage');
+            } else {
+                // Clear file handle from IndexedDB in browser
+                const db = await this.openAutosaveDB();
+                const transaction = db.transaction(['fileHandles'], 'readwrite');
+                const store = transaction.objectStore('fileHandles');
+                const request = store.delete('autosaveHandle');
+                
+                await new Promise((resolve, reject) => {
+                    request.onsuccess = () => {
+                        console.log('Autosave file handle cleared from IndexedDB');
+                        resolve();
+                    };
+                    request.onerror = () => {
+                        console.error('Error clearing autosave file handle:', request.error);
+                        reject(request.error);
+                    };
+                });
+                this.autosaveFileHandle = null;
+            }
         } catch (error) {
-            console.error('Error accessing IndexedDB to clear file handle:', error);
+            console.error('Error clearing autosave file handle/path:', error);
             throw error;
+        }
+    }
+    
+    async preloadAutosaveFileHandle() {
+        // Preload file handle for browser mode
+        try {
+            const savedHandle = await this.getStoredFileHandle();
+            if (savedHandle) {
+                this.autosaveFileHandle = savedHandle;
+                console.log('Preloaded autosave file handle');
+            }
+        } catch (error) {
+            console.log('Could not preload autosave file handle:', error);
+        }
+    }
+    
+    async preloadAutosaveFilePath() {
+        // Preload file path for Electron mode
+        try {
+            const savedPath = await window.electronAPI.getStoredFilePath();
+            if (savedPath) {
+                this.autosaveFilePath = savedPath;
+                console.log('Preloaded autosave file path:', savedPath);
+            }
+        } catch (error) {
+            console.log('Could not preload autosave file path:', error);
         }
     }
     
@@ -7992,7 +8080,7 @@ class DailyTodoApp {
         
         return {
             exportDate: new Date().toISOString(),
-            version: '1.5',
+            version: '6.0',
             autosave: true,
             data: allData,
             dailyNotes: dailyNotes,

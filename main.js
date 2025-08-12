@@ -1,5 +1,6 @@
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs').promises;
 
 // Fix for GPU process errors (especially on Linux/WSL)
 if (process.platform === 'linux') {
@@ -12,14 +13,15 @@ if (process.platform === 'linux') {
 
 let mainWindow;
 let isDev = process.argv.includes('--dev');
+let autosaveFilePath = null; // Store the selected autosave file path
 
 function createWindow() {
     // Create the browser window
     mainWindow = new BrowserWindow({
-        width: 1400,
-        height: 900,
-        minWidth: 800,
-        minHeight: 600,
+        width: 1900,
+        height: 1000,
+        minWidth: 1900,
+        minHeight: 1000,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -164,4 +166,62 @@ app.on('web-contents-created', (event, contents) => {
         event.preventDefault();
         shell.openExternal(navigationUrl);
     });
+});
+
+// IPC handlers for file operations
+ipcMain.handle('select-save-file', async () => {
+    const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Select Autosave File',
+        defaultPath: `todo-autosave-${new Date().toISOString().split('T')[0]}.json`,
+        filters: [
+            { name: 'JSON Files', extensions: ['json'] },
+            { name: 'All Files', extensions: ['*'] }
+        ]
+    });
+    
+    if (!result.canceled) {
+        autosaveFilePath = result.filePath;
+        return result.filePath;
+    }
+    return null;
+});
+
+ipcMain.handle('save-to-file', async (event, filePath, data) => {
+    try {
+        // Use the stored autosave path if no path is provided
+        const targetPath = filePath || autosaveFilePath;
+        if (!targetPath) {
+            throw new Error('No file path specified');
+        }
+        
+        await fs.writeFile(targetPath, data, 'utf8');
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving file:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('read-from-file', async (event, filePath) => {
+    try {
+        const data = await fs.readFile(filePath, 'utf8');
+        return { success: true, data };
+    } catch (error) {
+        console.error('Error reading file:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('get-stored-file-path', () => {
+    return autosaveFilePath;
+});
+
+ipcMain.handle('set-stored-file-path', (event, filePath) => {
+    autosaveFilePath = filePath;
+    return { success: true };
+});
+
+ipcMain.handle('clear-stored-file-path', () => {
+    autosaveFilePath = null;
+    return { success: true };
 });

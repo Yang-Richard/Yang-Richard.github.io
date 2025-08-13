@@ -18,6 +18,42 @@ body {
     overflow-y: auto;
 }
 
+/* Invisible draggable area for window dragging */
+.drag-region {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    z-index: 9999;
+    -webkit-app-region: drag;
+    background: transparent;
+    pointer-events: auto;
+}
+
+/* Ensure buttons and interactive elements in the drag region are not draggable */
+.drag-region button, 
+.drag-region input, 
+.drag-region select, 
+.drag-region textarea,
+.drag-region .nav-sidebar-btn {
+    -webkit-app-region: no-drag;
+}
+
+/* Clickable links in todo items */
+.todo-link {
+    color: #3498db;
+    text-decoration: underline;
+    cursor: pointer;
+    word-break: break-all;
+    -webkit-app-region: no-drag;
+}
+
+.todo-link:hover {
+    color: #2980b9;
+    text-decoration: none;
+}
+
 .container {
     max-width: none;
     margin: 0 auto;
@@ -109,7 +145,7 @@ h1 {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 8px;
+    padding: 8px 4px 4px 4px;
     color: #f8f9fa;
     background-color: #5DADE2;
     border-radius: 10px;
@@ -119,7 +155,7 @@ h1 {
 }
 
 .main-date {
-    font-size: 32px;
+    font-size: 29px;
     font-weight: 700;
     text-align: center;
     line-height: 1.1;
@@ -753,6 +789,7 @@ h1 {
     display: flex;
     flex-direction: column;
     height: 100%;
+    overflow: hidden;
 }
 
 .trash-panel {
@@ -805,6 +842,7 @@ h1 {
     border-radius: 10px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
     margin-bottom: 10px;
+    flex-shrink: 0;
 }
 
 .due-date-section {
@@ -884,6 +922,7 @@ h1 {
     min-height: 120px;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 /* Make misc items match kanban height in backburner panel */
@@ -3599,6 +3638,15 @@ body.dark-mode .main-layout {
     background-color: #1a1a1a;
 }
 
+/* Dark mode links */
+body.dark-mode .todo-link {
+    color: #5DADE2;
+}
+
+body.dark-mode .todo-link:hover {
+    color: #3498db;
+}
+
 /* Navigation sidebar */
 body.dark-mode .nav-sidebar {
     background-color: #2d2d2d;
@@ -4166,20 +4214,22 @@ body.dark-mode .toggle-slider:before {
     background-color: #e0e0e0;
 }
 
-/* Keyboard shortcuts background text */
-.keyboard-shortcuts-background {
+/* Shortcuts background text */
+.shortcuts-background {
     position: absolute;
-    bottom: 15%;
-    left: 30%;
-    transform: translate(-15%, 20%);
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 1;
     pointer-events: none;
     opacity: 0.5;
     user-select: none;
+    width: 90%;
+    max-width: 600px;
 }
 
 .shortcuts-text {
-    font-size: 20px;
+    font-size: 17px;
     color: #95a5a6;
     text-align: center;
     line-height: 1.4;

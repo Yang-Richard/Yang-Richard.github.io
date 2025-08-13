@@ -2,7 +2,7 @@
 
 ## 📋 Daily Todo Kanban Board
 
-Your all-in-one productivity app combining todo management, **all local in your browser**.
+Your all-in-one productivity app combining todo management, **all local in your browser or as a Windows app.**
 
 ⚠️ **Beta Notice:** Some edge cases may still have minor bugs. ⚠️
 
@@ -10,10 +10,10 @@ Your all-in-one productivity app combining todo management, **all local in your 
 
 ### Try the example board!
 
-1. **ADD TODOs** - Click the blue button at the top to add 200+ item examples and 2 recurring tasks.
-2.  **EXPLORE!** - Go to the TODO tab on the far right and mess around. 
-3.  **RESET** - Come back to the Wiki tab and clean the board.
-4.  **Start fresh!** - Add your own items.
+1 - **ADD TODOs** - Click the blue button at the top to add 200+ item examples and 2 recurring tasks.
+2 - **EXPLORE!** - Go to the TODO tab on the far right and mess around. 
+3 - **RESET** - Come back to the Wiki tab and clean the board.
+4 - **Start fresh!** - Add your own items.
 
 ### How to use?
 
@@ -52,7 +52,7 @@ Powerful automation for repetitive work with flexible scheduling options.
 - Monthly tasks on particular dates
 - Due date offsets to control when tasks are due relative to occurrence
 - Date ranges to control when recurring tasks are active
-- Duplicate existing tasks to create similar ones with different settings
+- Edit, duplicate, and delete recurring items
 
 ### 🔍 SEARCH Panel - Find & Navigate Items
 
@@ -121,5 +121,11 @@ App controls, statistics, and changelog.
 - **s**: Create new section
 - **n**: Move items to next business day
 - **p**: Start/pause Pomodoro timer
+
+### Window Controls (Electron App)
+- **Alt**: Show application menu
+- **Ctrl + Shift + T**: Toggle always on top
+- **F11**: Toggle fullscreen
+- **Ctrl + M**: Minimize window
 
 *Note: Shortcuts work when not typing in input fields*

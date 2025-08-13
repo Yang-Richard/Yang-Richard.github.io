@@ -1,6 +1,8 @@
-const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, dialog, nativeTheme, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
+const appConfig = require('./appConfig');
 
 // Fix for GPU process errors (especially on Linux/WSL)
 if (process.platform === 'linux') {
@@ -14,30 +16,68 @@ if (process.platform === 'linux') {
 let mainWindow;
 let isDev = process.argv.includes('--dev');
 let autosaveFilePath = null; // Store the selected autosave file path
+let windowState = null; // Store window state for persistence
 
 function createWindow() {
+    // Load saved window state
+    const savedState = loadWindowState();
+    
     // Create the browser window
     mainWindow = new BrowserWindow({
-        width: 1900,
-        height: 1000,
-        minWidth: 1537,
+        width: savedState?.width || 1900,
+        height: savedState?.height || 1000,
+        x: savedState?.x,
+        y: savedState?.y,
+        minWidth: 1536,
         minHeight: 960,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            webSecurity: true // Allow loading external fonts
+            webSecurity: true, // Allow loading external fonts
+            spellcheck: true // Enable spellcheck
         },
         icon: path.join(__dirname, 'build/icon.ico'), // You'll need to add an icon
-        show: false
+        show: false,
+        frame: false, // Remove title bar and window controls
+        autoHideMenuBar: false, // Doesn't work with frameless, we'll implement custom solution
+        backgroundColor: '#1e1e1e', // Set background color to prevent white flash
+        titleBarStyle: 'hidden', // macOS specific: hide title bar but keep traffic lights
+        trafficLightPosition: { x: 10, y: 10 }, // macOS: position traffic lights
+        transparent: false, // Could enable for custom backgrounds
+        hasShadow: true, // Window shadow for depth
+        roundedCorners: true // Rounded corners on supported platforms
     });
+    
+    // Restore maximized state if it was maximized
+    if (savedState?.isMaximized) {
+        mainWindow.maximize();
+    }
 
     // Load the index.html file
     mainWindow.loadFile('index.html');
 
-    // Show window when ready
+    // Show window when ready with fade-in effect
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
+        
+        // Smooth fade-in animation
+        let opacity = 0;
+        const fadeIn = setInterval(() => {
+            if (opacity >= 1) {
+                clearInterval(fadeIn);
+                return;
+            }
+            opacity += 0.1;
+            mainWindow.setOpacity(opacity);
+        }, 20);
+    });
+    
+    // Save window state on resize/move
+    ['resize', 'move', 'close'].forEach(event => {
+        mainWindow.on(event, () => {
+            saveWindowState();
+        });
     });
 
     // Open DevTools in development
@@ -120,17 +160,56 @@ function createMenu() {
                 {
                     label: 'About',
                     click: () => {
-                        mainWindow.webContents.executeJavaScript(`
-                            if (window.todoApp && window.todoApp.showPanel) {
-                                window.todoApp.showPanel('wiki');
-                            }
-                        `);
+                        // Show about dialog using config
+                        dialog.showMessageBox(mainWindow, {
+                            type: 'info',
+                            title: `About ${appConfig.name}`,
+                            message: appConfig.name,
+                            detail: appConfig.aboutDetails(),
+                            buttons: ['OK'],
+                            icon: path.join(__dirname, 'build/icon.ico')
+                        });
                     }
                 },
                 {
                     label: 'Learn More',
                     click: () => {
-                        shell.openExternal('https://github.com/yourusername/todo-app');
+                        // Switch to Wiki panel in the app
+                        mainWindow.webContents.executeJavaScript(`
+                            // Find and click the Wiki button
+                            const wikiBtn = document.getElementById('wikiNavBtn');
+                            if (wikiBtn) {
+                                wikiBtn.click();
+                            }
+                        `);
+                    }
+                },
+                { type: 'separator' },
+                {
+                    label: 'Keyboard Shortcuts',
+                    accelerator: 'CmdOrCtrl+/',
+                    click: () => {
+                        // Show keyboard shortcuts dialog
+                        dialog.showMessageBox(mainWindow, {
+                            type: 'info',
+                            title: 'Keyboard Shortcuts',
+                            message: 'Keyboard Shortcuts',
+                            detail: 'Navigation:\n' +
+                                    'Ctrl+1 to Ctrl+9 - Switch between panels\n' +
+                                    'T - Go to Today\n' +
+                                    'Arrow Keys - Navigate days\n\n' +
+                                    'Actions:\n' +
+                                    'S - New Section\n' +
+                                    'N - Move items to next day\n' +
+                                    'A - Focus on new item input\n' +
+                                    'P - Start/Stop Pomodoro\n\n' +
+                                    'Window (Electron):\n' +
+                                    'Alt - Show Menu\n' +
+                                    'Ctrl+Shift+T - Toggle Always on Top\n' +
+                                    'F11 - Toggle Fullscreen\n' +
+                                    'Ctrl+M - Minimize',
+                            buttons: ['OK']
+                        });
                     }
                 }
             ]
@@ -142,7 +221,17 @@ function createMenu() {
 }
 
 // This method will be called when Electron has finished initialization
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    createWindow();
+    
+    // Register global shortcuts
+    registerGlobalShortcuts();
+    
+    // Handle system theme changes
+    nativeTheme.on('updated', () => {
+        mainWindow.webContents.send('theme-changed', nativeTheme.shouldUseDarkColors);
+    });
+});
 
 // Quit when all windows are closed
 app.on('window-all-closed', () => {
@@ -274,6 +363,120 @@ ipcMain.handle('select-import-file', async () => {
     return { success: false, error: 'No file selected' };
 });
 
+// Window state management functions
+function saveWindowState() {
+    if (!mainWindow) return;
+    
+    const state = {
+        width: mainWindow.getBounds().width,
+        height: mainWindow.getBounds().height,
+        x: mainWindow.getBounds().x,
+        y: mainWindow.getBounds().y,
+        isMaximized: mainWindow.isMaximized()
+    };
+    
+    // Save to localStorage via IPC or to a file
+    try {
+        fsSync.writeFileSync(
+            path.join(app.getPath('userData'), 'window-state.json'),
+            JSON.stringify(state)
+        );
+    } catch (error) {
+        console.error('Error saving window state:', error);
+    }
+}
+
+function loadWindowState() {
+    try {
+        const statePath = path.join(app.getPath('userData'), 'window-state.json');
+        if (fsSync.existsSync(statePath)) {
+            return JSON.parse(fsSync.readFileSync(statePath, 'utf8'));
+        }
+    } catch (error) {
+        console.error('Error loading window state:', error);
+    }
+    return null;
+}
+
+// Register global shortcuts for better UX
+function registerGlobalShortcuts() {
+    // Toggle always on top
+    globalShortcut.register('CmdOrCtrl+Shift+T', () => {
+        const isAlwaysOnTop = mainWindow.isAlwaysOnTop();
+        mainWindow.setAlwaysOnTop(!isAlwaysOnTop);
+        mainWindow.webContents.send('always-on-top-changed', !isAlwaysOnTop);
+    });
+    
+    // Quick minimize
+    globalShortcut.register('CmdOrCtrl+M', () => {
+        mainWindow.minimize();
+    });
+    
+    // Toggle fullscreen
+    globalShortcut.register('F11', () => {
+        mainWindow.setFullScreen(!mainWindow.isFullScreen());
+    });
+}
+
+// Cleanup on app quit
+app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+});
+
+// Handle window control from renderer (for custom buttons)
+ipcMain.handle('window-minimize', () => {
+    mainWindow.minimize();
+    return { success: true };
+});
+
+ipcMain.handle('window-maximize', () => {
+    if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+    } else {
+        mainWindow.maximize();
+    }
+    return { success: true, isMaximized: mainWindow.isMaximized() };
+});
+
+ipcMain.handle('window-close', () => {
+    mainWindow.close();
+    return { success: true };
+});
+
+// Handle draggable regions
+ipcMain.handle('set-window-position', (event, x, y) => {
+    mainWindow.setPosition(x, y);
+    return { success: true };
+});
+
+// Get system theme
+ipcMain.handle('get-system-theme', () => {
+    return {
+        isDark: nativeTheme.shouldUseDarkColors,
+        theme: nativeTheme.themeSource
+    };
+});
+
+// Toggle always on top
+ipcMain.handle('toggle-always-on-top', () => {
+    const isAlwaysOnTop = mainWindow.isAlwaysOnTop();
+    mainWindow.setAlwaysOnTop(!isAlwaysOnTop);
+    return { success: true, isAlwaysOnTop: !isAlwaysOnTop };
+});
+
+// Show menu popup when Alt is pressed (for frameless window)
+ipcMain.handle('show-menu-popup', () => {
+    const menu = Menu.getApplicationMenu();
+    if (menu) {
+        menu.popup({
+            window: mainWindow,
+            x: 0,
+            y: 0
+        });
+    }
+    return { success: true };
+});
+
 // Native notification support
 ipcMain.handle('show-notification', async (event, title, options) => {
     try {
@@ -294,6 +497,17 @@ ipcMain.handle('show-notification', async (event, title, options) => {
         }
     } catch (error) {
         console.error('Error showing notification:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Open URL in external browser
+ipcMain.handle('open-external', async (event, url) => {
+    try {
+        await shell.openExternal(url);
+        return { success: true };
+    } catch (error) {
+        console.error('Error opening external URL:', error);
         return { success: false, error: error.message };
     }
 });

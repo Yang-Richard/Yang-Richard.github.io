@@ -25,5 +25,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectImportFile: () => ipcRenderer.invoke('select-import-file'),
     
     // Notification support
-    showNotification: (title, options) => ipcRenderer.invoke('show-notification', title, options)
+    showNotification: (title, options) => ipcRenderer.invoke('show-notification', title, options),
+    
+    // Menu popup for frameless window
+    showMenuPopup: () => ipcRenderer.invoke('show-menu-popup'),
+    
+    // Open URL in external browser
+    openExternal: (url) => ipcRenderer.invoke('open-external', url)
 });

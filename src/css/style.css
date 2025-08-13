@@ -739,8 +739,10 @@ h1 {
 }
 
 .left-panel {
+    /* Scale with window width, approximately matching center column width */
+    flex: 1 1 0;
+    min-width: 280px;
     width: 320px;
-    flex-shrink: 0;
     display: flex;
     flex-direction: column;
 }
@@ -756,17 +758,18 @@ h1 {
 }
 
 .center-section, .center-section-backburner {
-    flex: 1;
+    flex: 3 1 0;
     display: flex;
     flex-direction: column;
-    min-width: 1050px;
+    min-width: 900px;
 }
 
 .right-panel {
+    /* Keep right panel at a fixed comfortable width */
     width: 320px;
-    flex-shrink: 0;
     min-width: 320px;
     max-width: 320px;
+    flex: 0 0 320px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1002,6 +1005,8 @@ h1 {
     flex: 1;
     margin-top: 0px;
     gap: 5px;
+    position: relative;
+    z-index: 10;
 }
 
 .column-headers {
@@ -1044,6 +1049,8 @@ h1 {
     padding: 20px;
     box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
     min-height: 136px;
+    position: relative;
+    z-index: 10;
 }
 
 /* Section Styles */
@@ -3364,7 +3371,7 @@ label.settings-btn + .setting-description {
 .right-panel .pomodoro-container {
     background: #f8f9fa;
     border-radius: 8px;
-    padding: 4px 8px;
+    padding: 6px 8px 2px 8px;
     margin: 2px 0;
     border: 1px solid #e1e8ed;
 }
@@ -3376,14 +3383,14 @@ label.settings-btn + .setting-description {
     font-size: 14px;
     line-height: 1;
     margin: 0;
-    min-height: 20px;
+    height: 24px;
 }
 
 .right-panel .pomodoro-info {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 8px;
-    height: 20px;
+    height: 24px;
 }
 
 .right-panel .pomodoro-mode-text {
@@ -3391,26 +3398,23 @@ label.settings-btn + .setting-description {
     color: #2c3e50;
     font-size: 14px;
     line-height: 1;
-    display: flex;
-    align-items: center;
+    vertical-align: baseline;
 }
 
 .right-panel .pomodoro-timer {
     font-weight: 700;
     color: #2c3e50;
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1;
-    display: flex;
-    align-items: center;
+    vertical-align: baseline;
 }
 
 .right-panel .pomodoro-session {
-    font-size: 12px;
+    font-size: 14px;
     color: #7f8c8d;
     font-weight: 500;
     line-height: 1;
-    display: flex;
-    align-items: center;
+    vertical-align: baseline;
 }
 
 .right-panel .pomodoro-controls {
@@ -4001,8 +4005,69 @@ body.dark-mode input[type="color"] {
     border: 1px solid #555;
 }
 
+/* Enhanced responsive layout for larger screens */
+@media (min-width: 1920px) {
+    .center-section, .center-section-backburner {
+        min-width: 1000px;
+    }
+}
+
+@media (min-width: 2560px) {
+    .center-section, .center-section-backburner {
+        min-width: 1200px;
+    }
+}
+
 /* Toggle slider button in dark mode */
 body.dark-mode .toggle-slider:before {
     background-color: #e0e0e0;
+}
+
+/* Keyboard shortcuts background text */
+.keyboard-shortcuts-background {
+    position: absolute;
+    bottom: 15%;
+    left: 30%;
+    transform: translate(-15%, 20%);
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.8;
+    user-select: none;
+}
+
+.shortcuts-text {
+    font-size: 20px;
+    color: #95a5a6;
+    text-align: center;
+    line-height: 1.4;
+    font-weight: 300;
+}
+
+.shortcuts-title {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.shortcut-item {
+    display: block;
+    margin: 2px 0;
+}
+
+.shortcut-item kbd {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Make the background relative for positioning */
+.center-section {
+    position: relative;
 }
 

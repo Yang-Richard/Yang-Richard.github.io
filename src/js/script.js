@@ -231,9 +231,9 @@ class DailyTodoApp {
             undoBtn: () => this.performUndo(),
             newSectionBtn: () => this.createNewSection(),
             moveKanbanBtn: () => this.moveKanbanToNextDay(),
-            deleteNewItemsBtn: () => this.deleteNewItems(),
+            deleteNewItemsBtn: () => { this.deleteNewItems(); },
             emptyTrashBtn: () => this.emptyTrash(),
-            deleteMiscItemsBtn: () => this.deleteMiscItems(),
+            deleteMiscItemsBtn: () => { this.deleteMiscItems(); },
             deleteDayBtn: () => this.deleteCurrentDay(),
             deleteWeekBtn: () => this.deleteCurrentWeek(),
         };
@@ -291,7 +291,7 @@ class DailyTodoApp {
         this.settingsNavBtn.addEventListener('click', () => this.switchPanel('settings'));
         this.searchNavBtn.addEventListener('click', () => this.switchPanel('search'));
         this.showExampleBtn.addEventListener('click', () => this.showExample());
-        this.cleanBoardBtn.addEventListener('click', () => this.clearVisibleBoards());
+        this.cleanBoardBtn.addEventListener('click', () => { this.clearVisibleBoards(); });
         
         // Pomodoro functionality
         this.pomodoroStart.addEventListener('click', () => this.startPomodoro());
@@ -306,8 +306,14 @@ class DailyTodoApp {
         this.pomodoroLongBreakDuration.addEventListener('change', () => this.updatePomodoroSettings());
         this.pomodoroLongBreakDuration.addEventListener('input', () => this.updatePomodoroSettings());
         this.pomodoroNotifications.addEventListener('change', () => {
-            if (this.pomodoroNotifications.checked && 'Notification' in window && Notification.permission === 'default') {
-                Notification.requestPermission();
+            if (this.pomodoroNotifications.checked) {
+                if (this.isElectronMode()) {
+                    // Electron notifications don't need permission
+                    console.log('Electron notifications enabled');
+                } else if ('Notification' in window && Notification.permission === 'default') {
+                    // Request permission for web notifications
+                    Notification.requestPermission();
+                }
             }
             this.savePomodoroSettings();
             this.savePomodoroState();
@@ -902,12 +908,33 @@ class DailyTodoApp {
                 const isEnabled = e.target.checked;
                 
                 if (isEnabled) {
-                    // Check if we have a file selected
-                    const hasFileHandle = this.autosaveFileHandle || await this.getStoredFileHandle();
+                    // Check if we have a file selected (check both Electron and browser modes)
+                    let hasValidFile = false;
                     
-                    if (!hasFileHandle) {
+                    if (this.isElectronMode()) {
+                        // Check for Electron mode file path
+                        const savedPath = this.autosaveFilePath || await window.electronAPI.getStoredFilePath();
+                        if (savedPath) {
+                            hasValidFile = true;
+                            this.autosaveFilePath = savedPath;
+                        }
+                    } else {
+                        // Check for browser mode file handle
+                        const savedHandle = this.autosaveFileHandle || await this.getStoredFileHandle();
+                        if (savedHandle) {
+                            hasValidFile = true;
+                            this.autosaveFileHandle = savedHandle;
+                        }
+                    }
+                    
+                    if (!hasValidFile) {
                         // Prompt user to select a file first
-                        if (confirm('Autosave requires selecting a file location. Would you like to choose one now?')) {
+                        const shouldSelect = await this.showCustomConfirm(
+                            'Autosave requires selecting a file location. Would you like to choose one now?',
+                            'Select File',
+                            'Cancel'
+                        );
+                        if (shouldSelect) {
                             try {
                                 await this.selectAutosaveFile();
                                 // File was selected successfully, proceed with enabling
@@ -981,13 +1008,28 @@ class DailyTodoApp {
             // Add event listeners for the moved buttons
             document.getElementById('importFileSettings').addEventListener('change', (e) => this.importData(e));
             document.getElementById('importCsvFileSettings').addEventListener('change', (e) => this.importCsvData(e));
+            
+            // Add click handlers to labels for Electron mode
+            document.querySelector('label[for="importFileSettings"]').addEventListener('click', (e) => {
+                if (this.isElectronMode()) {
+                    e.preventDefault();
+                    this.importDataElectron('json');
+                }
+            });
+            
+            document.querySelector('label[for="importCsvFileSettings"]').addEventListener('click', (e) => {
+                if (this.isElectronMode()) {
+                    e.preventDefault();
+                    this.importDataElectron('csv');
+                }
+            });
             document.getElementById('showExampleBtnSettings').addEventListener('click', () => this.showExample());
             document.getElementById('deleteAllBtnSettings').addEventListener('click', () => this.deleteAllData());
-            document.getElementById('clearVisibleBoardsBtnSettings').addEventListener('click', () => this.clearVisibleBoards());
+            document.getElementById('clearVisibleBoardsBtnSettings').addEventListener('click', () => { this.clearVisibleBoards(); });
             
             // Add autosave button listeners
             document.getElementById('selectAutosaveFileBtn').addEventListener('click', () => this.selectAutosaveFile());
-            document.getElementById('saveNowBtn').addEventListener('click', () => this.performAutosave());
+            document.getElementById('saveNowBtn').addEventListener('click', () => this.performAutosave(true));
             
             this.settingsEventListenersAdded = true;
         }
@@ -1249,8 +1291,8 @@ class DailyTodoApp {
         document.getElementById('statsActiveDays').textContent = advancedStats.activeDays;
     }
     
-    clearAllDataWithConfirmation() {
-        const confirmed = confirm(
+    async clearAllDataWithConfirmation() {
+        const confirmed = await this.showCustomConfirm(
             'Are you sure you want to delete ALL data?\n\n' +
             'This will permanently remove:\n' +
             '• All todos and tasks\n' +
@@ -1259,11 +1301,17 @@ class DailyTodoApp {
             '• All sketches\n' +
             '• All settings\n' +
             '• Autosave file location\n\n' +
-            'This action cannot be undone!'
+            'This action cannot be undone!',
+            'Delete All Data',
+            'Keep Data'
         );
         
         if (confirmed) {
-            const doubleConfirmed = confirm('This is your final warning! Are you absolutely sure?');
+            const doubleConfirmed = await this.showCustomConfirm(
+                'This is your final warning! Are you absolutely sure?',
+                'Yes, Delete Everything',
+                'No, Keep Data'
+            );
             if (doubleConfirmed) {
                 localStorage.clear();
                 // Also clear autosave file handle from IndexedDB
@@ -1424,8 +1472,13 @@ class DailyTodoApp {
         }
     }
     
-    clearVisibleBoards() {
-        if (confirm('Clear all visible boards? This will remove all items from todos, backburner, recurring tasks, trash, notes, and sketches, but preserve your settings and preferences.')) {
+    async clearVisibleBoards() {
+        const shouldClear = await this.showCustomConfirm(
+            'Clear all visible boards? This will remove all items from todos, backburner, recurring tasks, trash, notes, and sketches, but preserve your settings and preferences.',
+            'Clear All Boards',
+            'Keep Boards'
+        );
+        if (shouldClear) {
             // Clear ALL daily todos (including all date-based entries)
             const keys = Object.keys(localStorage);
             keys.forEach(key => {
@@ -1541,7 +1594,7 @@ class DailyTodoApp {
         // Canvas actions
         this.undoSketch.addEventListener('click', () => this.undoCanvas());
         this.redoSketch.addEventListener('click', () => this.redoCanvas());
-        this.clearCanvas.addEventListener('click', () => this.clearCanvasConfirm());
+        this.clearCanvas.addEventListener('click', () => { this.clearCanvasConfirm(); });
     }
     
     selectTool(tool) {
@@ -1641,8 +1694,13 @@ class DailyTodoApp {
         img.src = dataURL;
     }
     
-    clearCanvasConfirm() {
-        if (confirm('Clear the entire canvas? This cannot be undone.')) {
+    async clearCanvasConfirm() {
+        const shouldClear = await this.showCustomConfirm(
+            'Clear the entire canvas? This cannot be undone.',
+            'Clear Canvas',
+            'Keep Canvas'
+        );
+        if (shouldClear) {
             this.saveCanvasState();
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             this.saveWhiteboard();
@@ -3205,6 +3263,132 @@ class DailyTodoApp {
         }, 2000);
     }
     
+    showCustomConfirm(message, confirmText = 'Delete Section', cancelText = 'Keep Section') {
+        return new Promise((resolve) => {
+            // Create modal overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+            
+            // Create modal dialog
+            const modal = document.createElement('div');
+            modal.className = 'custom-confirm-modal';
+            modal.style.cssText = `
+                background: white;
+                border-radius: 8px;
+                padding: 20px;
+                max-width: 400px;
+                min-width: 300px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                text-align: center;
+            `;
+            
+            // Create message
+            const messageEl = document.createElement('p');
+            messageEl.innerHTML = message.replace(/\n/g, '<br>');
+            messageEl.style.cssText = `
+                margin: 0 0 20px 0;
+                font-size: 16px;
+                line-height: 1.4;
+                white-space: pre-line;
+            `;
+            
+            // Create button container
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = `
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+            `;
+            
+            // Create buttons
+            const confirmBtn = document.createElement('button');
+            confirmBtn.textContent = confirmText;
+            confirmBtn.style.cssText = `
+                background: #e74c3c;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = cancelText;
+            cancelBtn.style.cssText = `
+                background: #95a5a6;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            
+            // Add event listeners with proper cleanup
+            let isResolved = false;
+            
+            const cleanupAndResolve = (result) => {
+                if (isResolved) return;
+                isResolved = true;
+                
+                document.removeEventListener('keydown', handleEscape);
+                if (document.body.contains(overlay)) {
+                    document.body.removeChild(overlay);
+                }
+                resolve(result);
+            };
+            
+            confirmBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                cleanupAndResolve(true);
+            });
+            
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                cleanupAndResolve(false);
+            });
+            
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    cleanupAndResolve(false);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+            
+            // Prevent clicking through overlay
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    // Clicking outside modal closes it
+                    cleanupAndResolve(false);
+                }
+            });
+            
+            // Assemble modal
+            buttonContainer.appendChild(cancelBtn);
+            buttonContainer.appendChild(confirmBtn);
+            modal.appendChild(messageEl);
+            modal.appendChild(buttonContainer);
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+        });
+    }
+    
     exportData() {
         try {
             console.log('Export started...');
@@ -3260,6 +3444,42 @@ class DailyTodoApp {
             console.log('Export data prepared:', exportData);
             
             const jsonString = JSON.stringify(exportData, null, 2);
+            
+            if (this.isElectronMode()) {
+                // Use Electron's native file dialog
+                this.exportDataElectron(jsonString);
+            } else {
+                // Use web blob download
+                this.exportDataWeb(jsonString);
+            }
+        } catch (error) {
+            console.error('Export failed:', error);
+            this.showFeedback('Export failed: ' + error.message, 'error');
+        }
+    }
+    
+    async exportDataElectron(jsonString) {
+        try {
+            const filePath = await window.electronAPI.selectExportFile();
+            if (filePath) {
+                const result = await window.electronAPI.saveToFile(filePath, jsonString);
+                if (result.success) {
+                    this.showFeedback('Data exported successfully!');
+                    console.log('Export completed to:', filePath);
+                } else {
+                    throw new Error(result.error || 'Failed to save file');
+                }
+            } else {
+                this.showFeedback('Export cancelled', 'info');
+            }
+        } catch (error) {
+            console.error('Electron export failed:', error);
+            this.showFeedback('Export failed: ' + error.message, 'error');
+        }
+    }
+    
+    exportDataWeb(jsonString) {
+        try {
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             
@@ -3274,7 +3494,7 @@ class DailyTodoApp {
             console.log('Export download triggered');
             this.showFeedback('Data exported successfully!');
         } catch (error) {
-            console.error('Export failed:', error);
+            console.error('Web export failed:', error);
             this.showFeedback('Export failed: ' + error.message, 'error');
         }
     }
@@ -3440,7 +3660,7 @@ class DailyTodoApp {
         if (!file) return;
         
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const rawData = JSON.parse(e.target.result);
                 
@@ -3451,10 +3671,12 @@ class DailyTodoApp {
                     throw new Error('Invalid file format');
                 }
                 
-                const confirmImport = confirm(
+                const confirmImport = await this.showCustomConfirm(
                     `Import ${Object.keys(importedData.data).length} days of todo data?\n\n` +
                     `This will overwrite existing data for those dates.\n` +
-                    `Export Date: ${new Date(importedData.exportDate).toLocaleDateString()}`
+                    `Export Date: ${new Date(importedData.exportDate).toLocaleDateString()}`,
+                    'Import Data',
+                    'Cancel Import'
                 );
                 
                 if (confirmImport) {
@@ -3524,7 +3746,7 @@ class DailyTodoApp {
         if (!file) return;
         
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const csvText = e.target.result;
                 const lines = csvText.split('\n').filter(line => line.trim());
@@ -3566,10 +3788,12 @@ class DailyTodoApp {
                     throw new Error('No valid items found in CSV file');
                 }
                 
-                const confirmImport = confirm(
+                const confirmImport = await this.showCustomConfirm(
                     `Import ${items.length} items from CSV?\n\n` +
                     `This will add items to existing data without overwriting.\n` +
-                    `Items will be distributed across panels: ${[...new Set(items.map(i => i.panel))].join(', ')}`
+                    `Items will be distributed across panels: ${[...new Set(items.map(i => i.panel))].join(', ')}`,
+                    'Import CSV',
+                    'Cancel Import'
                 );
                 
                 if (confirmImport) {
@@ -3815,6 +4039,143 @@ class DailyTodoApp {
         });
         
         localStorage.setItem('dailyTodos_trash', JSON.stringify(trashData));
+    }
+    
+    async importDataElectron(fileType) {
+        try {
+            const result = await window.electronAPI.selectImportFile();
+            
+            if (!result.success) {
+                this.showFeedback('Import cancelled', 'info');
+                return;
+            }
+            
+            const { data, fileName } = result;
+            
+            if (fileType === 'json') {
+                await this.processJsonImportData(data, fileName);
+            } else if (fileType === 'csv') {
+                await this.processCsvImportData(data, fileName);
+            }
+            
+        } catch (error) {
+            console.error('Electron import failed:', error);
+            this.showFeedback('Import failed: ' + error.message, 'error');
+        }
+    }
+    
+    async processJsonImportData(data, fileName) {
+        try {
+            const rawData = JSON.parse(data);
+            
+            // Add backwards compatibility defaults
+            const importedData = this.normalizeImportData(rawData);
+            
+            if (!importedData.data) {
+                throw new Error('Invalid file format');
+            }
+            
+            const confirmImport = await this.showCustomConfirm(
+                `Import ${Object.keys(importedData.data).length} days of todo data from ${fileName}?\n\n` +
+                `This will overwrite existing data for those dates.\n` +
+                `Export Date: ${new Date(importedData.exportDate).toLocaleDateString()}`,
+                'Import Data',
+                'Cancel Import'
+            );
+            
+            if (confirmImport) {
+                Object.entries(importedData.data).forEach(([date, todos]) => {
+                    localStorage.setItem(`dailyTodos_${date}`, JSON.stringify(todos));
+                });
+                
+                // Import global unsorted items if they exist
+                if (importedData.globalUnsortedItems) {
+                    localStorage.setItem('globalUnsortedItems', JSON.stringify(importedData.globalUnsortedItems));
+                }
+                
+                // Import backburner items if they exist
+                if (importedData.backburnerItems) {
+                    localStorage.setItem('backburnerItems', JSON.stringify(importedData.backburnerItems));
+                }
+                
+                // Import trash items if they exist
+                if (importedData.trashItems) {
+                    localStorage.setItem('dailyTodos_trash', JSON.stringify(importedData.trashItems));
+                }
+                
+                // Import notes if they exist
+                if (importedData.notes !== undefined) {
+                    localStorage.setItem('dailyTodos_notes', importedData.notes);
+                }
+                
+                // Import whiteboard if it exists
+                if (importedData.whiteboard !== undefined) {
+                    localStorage.setItem('dailyTodos_whiteboard', importedData.whiteboard);
+                }
+                
+                // Import recurring tasks if they exist
+                if (importedData.recurringTasks) {
+                    localStorage.setItem('recurringTasks', JSON.stringify(importedData.recurringTasks));
+                }
+                
+                // Import daily notes if they exist
+                if (importedData.dailyNotes) {
+                    Object.entries(importedData.dailyNotes).forEach(([date, notes]) => {
+                        localStorage.setItem(`dailyNotes_${date}`, notes);
+                    });
+                }
+                
+                this.showFeedback(`Data imported successfully from ${fileName}!`);
+                this.loadTodosForDate();
+                this.loadBackburnerItems();
+                this.loadTrashItems();
+                
+                // Reload the current view to show imported data
+                if (typeof this.refreshAll === 'function') {
+                    this.refreshAll();
+                }
+            }
+        } catch (error) {
+            console.error('JSON import processing failed:', error);
+            this.showFeedback('Failed to import JSON data: ' + error.message, 'error');
+        }
+    }
+    
+    async processCsvImportData(data, fileName) {
+        try {
+            const lines = data.split('\n').filter(line => line.trim());
+            
+            if (lines.length === 0) {
+                this.showFeedback('CSV file is empty', 'error');
+                return;
+            }
+            
+            const confirmImport = await this.showCustomConfirm(
+                `Import ${lines.length} items from CSV file ${fileName}?\n\n` +
+                `Items will be added to today's todo list.`,
+                'Import CSV',
+                'Cancel Import'
+            );
+            
+            if (confirmImport) {
+                const items = lines.map(line => {
+                    const parts = this.parseCsvLine(line);
+                    return {
+                        text: parts[0] || 'Untitled Item',
+                        date: this.formatDate(new Date()),
+                        column: 'todo',
+                        panel: 'todo',
+                        high_priority: false
+                    };
+                });
+                
+                this.processCsvItems(items);
+                this.showFeedback(`${items.length} items imported successfully from ${fileName}!`);
+            }
+        } catch (error) {
+            console.error('CSV import processing failed:', error);
+            this.showFeedback('Failed to import CSV data: ' + error.message, 'error');
+        }
     }
     
     autoDebugExport() {
@@ -4087,46 +4448,110 @@ class DailyTodoApp {
     deleteNewItems() {
         const globalUnsorted = localStorage.getItem('globalUnsortedItems');
         if (!globalUnsorted) {
-            alert('No new items to delete.');
+            alert('No new items to move to trash.');
             return;
         }
         
         const unsortedItems = JSON.parse(globalUnsorted);
         if (unsortedItems.length === 0) {
-            alert('No new items to delete.');
+            alert('No new items to move to trash.');
             return;
         }
         
-        if (confirm(`⚠️ DELETE NEW ITEMS?\n\nThis will permanently delete all ${unsortedItems.length} items in the "New Items" section.\n\nThis action can be undone.`)) {
-            this.captureStateForUndo('delete', `Delete ${unsortedItems.length} new items`);
-            localStorage.removeItem('globalUnsortedItems');
-            this.unsortedItems.innerHTML = '';
-            this.showFeedback('New items deleted successfully');
-        }
+        this.showCustomConfirm(
+            `⚠️ Move ${unsortedItems.length} New Items to Trash?\n\nThese items will be moved to the trash where they can be restored if needed.`,
+            'Move to Trash',
+            'Keep Items'
+        ).then((shouldMove) => {
+            if (shouldMove) {
+                this.captureStateForUndo('move_to_trash', `Move ${unsortedItems.length} new items to trash`);
+                
+                // Get existing trash data
+                const existingTrash = JSON.parse(localStorage.getItem('dailyTodos_trash') || '[]');
+                
+                // Convert unsorted items to trash format
+                unsortedItems.forEach(item => {
+                    const trashItem = {
+                        id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        itemId: item.id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        text: item.text,
+                        createdAt: item.createdAt || new Date().toISOString(),
+                        sectionId: null,
+                        dueDate: null,
+                        highPriority: item.highPriority || false,
+                        panel: 'new_items',
+                        originalColumnType: 'unsorted',
+                        originalDate: this.getDateKey(),
+                        movedToTrashAt: new Date().toISOString()
+                    };
+                    existingTrash.push(trashItem);
+                });
+                
+                // Save updated trash and clear new items
+                localStorage.setItem('dailyTodos_trash', JSON.stringify(existingTrash));
+                localStorage.removeItem('globalUnsortedItems');
+                this.unsortedItems.innerHTML = '';
+                this.loadTrashItems();
+                this.updateAllItemCounts();
+                this.showFeedback(`Moved ${unsortedItems.length} new items to trash`);
+            }
+        });
     }
 
     deleteMiscItems() {
         const backburnerItems = localStorage.getItem('backburnerItems');
         if (!backburnerItems) {
-            alert('No misc items to delete.');
+            alert('No misc items to move to trash.');
             return;
         }
         
         const items = JSON.parse(backburnerItems);
         if (items.length === 0) {
-            alert('No misc items to delete.');
+            alert('No misc items to move to trash.');
             return;
         }
         
-        if (confirm(`⚠️ DELETE MISC ITEMS?\n\nThis will permanently delete all ${items.length} items in the "Misc Items" section.\n\nThis action can be undone.`)) {
-            this.captureStateForUndo('delete', `Delete ${items.length} misc items`);
-            localStorage.removeItem('backburnerItems');
-            this.backburnerUnsortedItems.innerHTML = '';
-            this.showFeedback('Misc items deleted successfully');
-        }
+        this.showCustomConfirm(
+            `⚠️ Move ${items.length} Misc Items to Trash?\n\nThese items will be moved to the trash where they can be restored if needed.`,
+            'Move to Trash',
+            'Keep Items'
+        ).then((shouldMove) => {
+            if (shouldMove) {
+                this.captureStateForUndo('move_to_trash', `Move ${items.length} misc items to trash`);
+                
+                // Get existing trash data
+                const existingTrash = JSON.parse(localStorage.getItem('dailyTodos_trash') || '[]');
+                
+                // Convert misc items to trash format
+                items.forEach(item => {
+                    const trashItem = {
+                        id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        itemId: item.id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        text: item.text,
+                        createdAt: item.createdAt || new Date().toISOString(),
+                        sectionId: null,
+                        dueDate: null,
+                        highPriority: item.highPriority || false,
+                        panel: 'misc_items',
+                        originalColumnType: 'backburner_unsorted',
+                        originalDate: this.getDateKey(),
+                        movedToTrashAt: new Date().toISOString()
+                    };
+                    existingTrash.push(trashItem);
+                });
+                
+                // Save updated trash and clear misc items
+                localStorage.setItem('dailyTodos_trash', JSON.stringify(existingTrash));
+                localStorage.removeItem('backburnerItems');
+                this.backburnerUnsortedItems.innerHTML = '';
+                this.loadTrashItems();
+                this.updateAllItemCounts();
+                this.showFeedback(`Moved ${items.length} misc items to trash`);
+            }
+        });
     }
 
-    deleteCurrentDay() {
+    async deleteCurrentDay() {
         const dateKey = this.getDateKey();
         const dateDisplay = this.currentDate.toLocaleDateString('en-US', { 
             weekday: 'long', 
@@ -4135,8 +4560,18 @@ class DailyTodoApp {
             day: 'numeric' 
         });
         
-        if (confirm(`⚠️ DELETE CURRENT DAY?\n\nThis will permanently delete all todos for:\n${dateDisplay}\n\nThis action cannot be undone.`)) {
-            if (confirm(`🚨 FINAL CONFIRMATION\n\nAre you absolutely sure you want to delete all todos for ${dateDisplay}?\n\nClick OK to DELETE or Cancel to keep your data.`)) {
+        const shouldDelete = await this.showCustomConfirm(
+            `⚠️ DELETE CURRENT DAY?\n\nThis will permanently delete all todos for:\n${dateDisplay}\n\nThis action cannot be undone.`,
+            'Delete Day',
+            'Keep Day'
+        );
+        if (shouldDelete) {
+            const finalConfirm = await this.showCustomConfirm(
+                `🚨 FINAL CONFIRMATION\n\nAre you absolutely sure you want to delete all todos for ${dateDisplay}?\n\nThis will DELETE everything for this day!`,
+                'Yes, Delete Day',
+                'No, Keep Day'
+            );
+            if (finalConfirm) {
                 localStorage.removeItem(`dailyTodos_${dateKey}`);
                 this.loadTodosForDate();
                 this.showFeedback(`Deleted all todos for ${dateDisplay}`);
@@ -4144,7 +4579,7 @@ class DailyTodoApp {
         }
     }
     
-    deleteCurrentWeek() {
+    async deleteCurrentWeek() {
         // Get start of week (Sunday)
         const weekStart = new Date(this.currentDate);
         const dayOfWeek = weekStart.getDay();
@@ -4159,8 +4594,18 @@ class DailyTodoApp {
         
         const weekRange = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
         
-        if (confirm(`⚠️ DELETE CURRENT WEEK?\n\nThis will permanently delete all todos for the week:\n${weekRange}\n\nThis includes all 7 days and cannot be undone.`)) {
-            if (confirm(`🚨 FINAL CONFIRMATION\n\nAre you absolutely sure you want to delete the entire week (${weekRange})?\n\nThis will delete ALL todos for 7 days.\n\nClick OK to DELETE or Cancel to keep your data.`)) {
+        const shouldDelete = await this.showCustomConfirm(
+            `⚠️ DELETE CURRENT WEEK?\n\nThis will permanently delete all todos for the week:\n${weekRange}\n\nThis includes all 7 days and cannot be undone.`,
+            'Delete Week',
+            'Keep Week'
+        );
+        if (shouldDelete) {
+            const finalConfirm = await this.showCustomConfirm(
+                `🚨 FINAL CONFIRMATION\n\nAre you absolutely sure you want to delete the entire week (${weekRange})?\n\nThis will delete ALL todos for 7 days!`,
+                'Yes, Delete Week',
+                'No, Keep Week'
+            );
+            if (finalConfirm) {
                 let deletedDays = 0;
                 weekDates.forEach(date => {
                     const dateKey = date.toISOString().split('T')[0];
@@ -4177,7 +4622,7 @@ class DailyTodoApp {
         }
     }
     
-    deleteAllData() {
+    async deleteAllData() {
         const allKeys = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -4191,8 +4636,18 @@ class DailyTodoApp {
             return;
         }
         
-        if (confirm(`⚠️ DELETE ALL TODO DATA?\n\nThis will permanently delete ALL your todos from ALL days (${allKeys.length} days total).\n\nThis action cannot be undone and will clear your entire todo history.\n\nNotes and sketches will remain intact.`)) {
-            if (confirm(`🚨 FINAL CONFIRMATION\n\nYou are about to delete ${allKeys.length} days of todo data.\n\nTHIS WILL DELETE ALL TODO ITEMS!\n\nNotes and sketches will be preserved.`)) {
+        const shouldDelete = await this.showCustomConfirm(
+            `⚠️ DELETE ALL TODO DATA?\n\nThis will permanently delete ALL your todos from ALL days (${allKeys.length} days total).\n\nThis action cannot be undone and will clear your entire todo history.\n\nNotes and sketches will remain intact.`,
+            'Delete All Todos',
+            'Keep Todos'
+        );
+        if (shouldDelete) {
+            const finalConfirm = await this.showCustomConfirm(
+                `🚨 FINAL CONFIRMATION\n\nYou are about to delete ${allKeys.length} days of todo data.\n\nTHIS WILL DELETE ALL TODO ITEMS!\n\nNotes and sketches will be preserved.`,
+                'Yes, Delete All Todos',
+                'No, Keep Todos'
+            );
+            if (finalConfirm) {
                 allKeys.forEach(key => localStorage.removeItem(key));
                 // Also delete global data
                 localStorage.removeItem('globalUnsortedItems');
@@ -4211,7 +4666,7 @@ class DailyTodoApp {
         }
     }
     
-    clearAllStorage() {
+    async clearAllStorage() {
         const totalItems = localStorage.length;
         
         if (totalItems === 0) {
@@ -4219,8 +4674,18 @@ class DailyTodoApp {
             return;
         }
         
-        if (confirm(`⚠️ CLEAR ALL LOCAL STORAGE?\n\nThis will permanently delete ALL data stored by this tab, including:\n- All todo data (${totalItems} items total)\n- Settings and preferences\n- Notes and sketches\n- Any other stored data\n\nThis action cannot be undone and will reset the app to a fresh state.`)) {
-            if (confirm(`🚨 FINAL CONFIRMATION\n\nYou are about to clear ALL ${totalItems} items from local storage.\n\nTHIS WILL DELETE EVERYTHING AND RESET THE APP!\n\nClick OK to proceed or Cancel to abort.`)) {
+        const shouldClear = await this.showCustomConfirm(
+            `⚠️ CLEAR ALL LOCAL STORAGE?\n\nThis will permanently delete ALL data stored by this tab, including:\n- All todo data (${totalItems} items total)\n- Settings and preferences\n- Notes and sketches\n- Any other stored data\n\nThis action cannot be undone and will reset the app to a fresh state.`,
+            'Clear All Storage',
+            'Keep Storage'
+        );
+        if (shouldClear) {
+            const finalConfirm = await this.showCustomConfirm(
+                `🚨 FINAL CONFIRMATION\n\nYou are about to clear ALL ${totalItems} items from local storage.\n\nTHIS WILL DELETE EVERYTHING AND RESET THE APP!`,
+                'Yes, Clear Everything',
+                'No, Keep Data'
+            );
+            if (finalConfirm) {
                 localStorage.clear();
                 location.reload(); // Reload the page to reset the app state
             } else {
@@ -4229,7 +4694,7 @@ class DailyTodoApp {
         }
     }
     
-    emptyTrash() {
+    async emptyTrash() {
         // Get all visible items from the current panel
         let allItems = [];
         let panelName = '';
@@ -4259,18 +4724,24 @@ class DailyTodoApp {
                 return;
             }
             
-            if (confirm(`⚠️ Empty Trash?\n\nThis will permanently delete ${itemCount} item${itemCount !== 1 ? 's' : ''} from the trash.\n\nThis action cannot be undone.`)) {
-                this.captureStateForUndo('empty_trash', `Empty trash (${itemCount} items)`);
-                
-                // Clear localStorage
-                localStorage.removeItem('dailyTodos_trash');
-                
-                // Clear DOM elements
-                this.trashColumns.innerHTML = '<div class="panel-content" style="text-align: center; color: #7f8c8d; padding: 40px;"> </div>';
-                
-                this.updateAllItemCounts();
-                this.showFeedback(`Emptied trash - deleted ${itemCount} item${itemCount !== 1 ? 's' : ''}`);
-            }
+            this.showCustomConfirm(
+                `Empty trash and permanently delete ${itemCount} item${itemCount !== 1 ? 's' : ''}?\n\n⚠️ This action cannot be undone.`,
+                'Empty Trash',
+                'Keep Items'
+            ).then((shouldEmpty) => {
+                if (shouldEmpty) {
+                    this.captureStateForUndo('empty_trash', `Empty trash (${itemCount} items)`);
+                    
+                    // Clear localStorage
+                    localStorage.removeItem('dailyTodos_trash');
+                    
+                    // Clear DOM elements
+                    this.trashColumns.innerHTML = '<div class="panel-content" style="text-align: center; color: #7f8c8d; padding: 40px;"> </div>';
+                    
+                    this.updateAllItemCounts();
+                    this.showFeedback(`Emptied trash - deleted ${itemCount} item${itemCount !== 1 ? 's' : ''}`);
+                }
+            });
             return;
         }
         
@@ -4279,7 +4750,12 @@ class DailyTodoApp {
             return;
         }
         
-        if (confirm(`⚠️ Move All Items to Trash?\n\nThis will move all ${allItems.length} visible item${allItems.length !== 1 ? 's' : ''} to the trash.\n\nThey can be restored from the trash if needed.`)) {
+        const shouldMove = await this.showCustomConfirm(
+            `⚠️ Move All Items to Trash?\n\nThis will move all ${allItems.length} visible item${allItems.length !== 1 ? 's' : ''} to the trash.\n\nThey can be restored from the trash if needed.`,
+            'Move to Trash',
+            'Keep Items'
+        );
+        if (shouldMove) {
             this.captureStateForUndo('move_all_to_trash', `Move all ${allItems.length} ${panelName} items to trash`);
             
             // Move all items to trash using the same logic as individual items
@@ -5950,42 +6426,48 @@ class DailyTodoApp {
         const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
         const sectionName = sectionElement.querySelector('.section-title').value;
         
-        if (confirm(`Delete section "${sectionName}" and move all items back to main columns?`)) {
-            this.captureStateForUndo('section', `Delete section "${sectionName}"`);
-            
-            // Move all items back to main columns
-            const allItems = sectionElement.querySelectorAll('.todo-item');
-            allItems.forEach(item => {
-                // Remove section ID from item
-                delete item.dataset.sectionId;
+        this.showCustomConfirm(
+            `Delete section "${sectionName}"?\n\nAll items in this section will be moved back to the main columns.`,
+            'Delete Section',
+            'Keep Section'
+        ).then((shouldDelete) => {
+            if (shouldDelete) {
+                this.captureStateForUndo('section', `Delete section "${sectionName}"`);
                 
-                // Determine which main column to move to based on current section column
-                const parentColumn = item.closest('.section-column');
-                let targetColumn;
+                // Move all items back to main columns
+                const allItems = sectionElement.querySelectorAll('.todo-item');
+                allItems.forEach(item => {
+                    // Remove section ID from item
+                    delete item.dataset.sectionId;
+                    
+                    // Determine which main column to move to based on current section column
+                    const parentColumn = item.closest('.section-column');
+                    let targetColumn;
+                    
+                    if (parentColumn.classList.contains('section-todo')) {
+                        targetColumn = this.todoItems;
+                    } else if (parentColumn.classList.contains('section-in-progress')) {
+                        targetColumn = this.inProgressItems;
+                    } else if (parentColumn.classList.contains('section-done')) {
+                        targetColumn = this.doneItems;
+                    } else {
+                        targetColumn = this.todoItems; // default
+                    }
+                    
+                    targetColumn.appendChild(item);
+                });
                 
-                if (parentColumn.classList.contains('section-todo')) {
-                    targetColumn = this.todoItems;
-                } else if (parentColumn.classList.contains('section-in-progress')) {
-                    targetColumn = this.inProgressItems;
-                } else if (parentColumn.classList.contains('section-done')) {
-                    targetColumn = this.doneItems;
-                } else {
-                    targetColumn = this.todoItems; // default
-                }
+                // Remove section element
+                sectionElement.remove();
                 
-                targetColumn.appendChild(item);
-            });
-            
-            // Remove section element
-            sectionElement.remove();
-            
-            this.saveTodosForDate();
-            this.updateAllItemCounts();
-            this.showFeedback(`Deleted section "${sectionName}"`);
-            
-            // Update destination dropdowns when section is deleted
-            this.populateDestinationDropdowns();
-        }
+                this.saveTodosForDate();
+                this.updateAllItemCounts();
+                this.showFeedback(`Deleted section "${sectionName}"`);
+                
+                // Update destination dropdowns when section is deleted
+                this.populateDestinationDropdowns();
+            }
+        });
     }
     
     moveSectionToNextDay(sectionId) {
@@ -6100,7 +6582,7 @@ class DailyTodoApp {
         }
     }
     
-    moveKanbanToNextDay() {
+    async moveKanbanToNextDay() {
         const nextDate = this.getNextBusinessDay();
         const nextDateStr = this.formatDateShort(nextDate);
         
@@ -6140,7 +6622,12 @@ class DailyTodoApp {
             confirmMessage = `Move ${emptySectionsToMove} empty section${emptySectionsToMove !== 1 ? 's' : ''} to ${nextDateStr}?`;
         }
         
-        if (confirm(confirmMessage)) {
+        const shouldMove = await this.showCustomConfirm(
+            confirmMessage,
+            'Move Items',
+            'Keep Items'
+        );
+        if (shouldMove) {
             this.captureStateForUndo('bulk_move', `Move ${itemCount} items to ${nextDateStr}`);
             // First, handle regular main column items
             const todoItemsToMove = Array.from(this.todoItems.children);
@@ -6643,7 +7130,7 @@ class DailyTodoApp {
         return this.captureStorageData('dailyTodos_trash');
     }
     
-    performUndo() {
+    async performUndo() {
         if (this.undoStack.length === 0) {
             alert('Nothing to undo');
             return;
@@ -6651,7 +7138,12 @@ class DailyTodoApp {
         
         const lastState = this.undoStack.pop();
         
-        if (confirm(`Undo: ${lastState.description}?`)) {
+        const shouldUndo = await this.showCustomConfirm(
+            `Undo: ${lastState.description}?`,
+            'Undo',
+            'Cancel'
+        );
+        if (shouldUndo) {
             // Navigate to the date if different
             if (lastState.date.getTime() !== this.currentDate.getTime()) {
                 this.currentDate = new Date(lastState.date);
@@ -6994,9 +7486,15 @@ class DailyTodoApp {
             const sectionName = originalSection.querySelector('.section-title').value;
             const message = `The section "${sectionName}" is now empty. Would you like to delete the empty section?`;
             
-            if (confirm(message)) {
-                this.deleteSectionWithItems(originalSectionId);
-            }
+            this.showCustomConfirm(
+                message,
+                'Delete Section',
+                'Keep Section'
+            ).then((shouldDelete) => {
+                if (shouldDelete) {
+                    this.deleteSectionWithItems(originalSectionId);
+                }
+            });
         }
         // If section has done items (doneItems > 0), do nothing - keep the section
     }
@@ -7064,14 +7562,16 @@ class DailyTodoApp {
             
             let message;
             if (hasOnlyDoneItems) {
-                message = `The backburner section "${sectionName}" now only has completed items. Would you like to keep the section or delete it?\n\n(The completed items will remain in place)`;
+                message = `The backburner section "${sectionName}" now only has completed items. What would you like to do?\n\n⚠️ If you delete the section, the completed items will be permanently deleted.`;
             } else {
                 message = `The backburner section "${sectionName}" is now empty. Would you like to delete the empty section?`;
             }
             
-            if (confirm(message)) {
-                this.deleteBackburnerSectionWithItems(originalSectionId);
-            }
+            this.showCustomConfirm(message).then((shouldDelete) => {
+                if (shouldDelete) {
+                    this.deleteBackburnerSectionWithItems(originalSectionId);
+                }
+            });
         }
     }
     
@@ -7081,9 +7581,13 @@ class DailyTodoApp {
         
         const sectionName = sectionElement.querySelector('.section-title').value;
         
-        // Move all items back to misc items before deleting section
-        const allItems = sectionElement.querySelectorAll('.todo-item');
-        allItems.forEach(item => {
+        // Check what types of items are in the section
+        const todoItems = sectionElement.querySelectorAll('.section-todo .todo-item');
+        const inProgressItems = sectionElement.querySelectorAll('.section-in-progress .todo-item');
+        const doneItems = sectionElement.querySelectorAll('.section-done .todo-item');
+        
+        // Move non-done items to misc items, but delete done items
+        [...todoItems, ...inProgressItems].forEach(item => {
             // Clear section association
             item.dataset.sectionId = '';
             item.dataset.sectionName = '';
@@ -7094,6 +7598,11 @@ class DailyTodoApp {
             }
         });
         
+        // Delete done items (move them to trash)
+        doneItems.forEach(item => {
+            this.moveItemToTrash(item, false); // false = don't capture undo state for each item
+        });
+        
         // Remove the section element
         sectionElement.remove();
         
@@ -7101,7 +7610,11 @@ class DailyTodoApp {
         this.saveBackburnerItems();
         this.updateAllItemCounts();
         
-        this.showFeedback(`Deleted backburner section "${sectionName}" and moved items to misc items`);
+        if (doneItems.length > 0) {
+            this.showFeedback(`Deleted backburner section "${sectionName}" and deleted ${doneItems.length} completed items`);
+        } else {
+            this.showFeedback(`Deleted backburner section "${sectionName}"`);
+        }
     }
 
     getDefaultDueDate() {
@@ -7288,13 +7801,19 @@ class DailyTodoApp {
             createdAt: new Date().toISOString()
         };
         
-        if (confirm(`Create recurring task "${taskText}"?\n\nThis will generate tasks for the entire date range (${this.formatDateShort(startDate)} to ${this.formatDateShort(endDate)}).`)) {
-            this.saveRecurringTask(recurringTask);
-            this.generateRecurringTaskInstances(recurringTask);
-            this.clearRecurringForm();
-            this.loadRecurringTasks();
-            this.showFeedback(`Recurring task "${taskText}" created successfully!`);
-        }
+        this.showCustomConfirm(
+            `Create recurring task "${taskText}"?\n\nThis will generate tasks for the entire date range (${this.formatDateShort(startDate)} to ${this.formatDateShort(endDate)}).`,
+            'Create Task',
+            'Cancel'
+        ).then((shouldCreate) => {
+            if (shouldCreate) {
+                this.saveRecurringTask(recurringTask);
+                this.generateRecurringTaskInstances(recurringTask);
+                this.clearRecurringForm();
+                this.loadRecurringTasks();
+                this.showFeedback(`Recurring task "${taskText}" created successfully!`);
+            }
+        });
     }
     
     saveRecurringTask(recurringTask) {
@@ -7594,17 +8113,23 @@ class DailyTodoApp {
         
         if (!task) return;
         
-        if (confirm(`Delete recurring task "${task.text}"?\n\nThis will delete the recurring task definition and all instances across all dates.`)) {
-            // Delete all instances
-            this.deleteRecurringTaskInstances(taskId);
-            
-            // Remove from recurring tasks list
-            const updatedTasks = recurringTasks.filter(t => t.id !== taskId);
-            localStorage.setItem('recurringTasks', JSON.stringify(updatedTasks));
-            
-            this.loadRecurringTasks();
-            this.showFeedback(`Recurring task "${task.text}" deleted successfully.`);
-        }
+        this.showCustomConfirm(
+            `Delete recurring task "${task.text}"?\n\nThis will delete the recurring task definition and all instances across all dates.`,
+            'Delete Task',
+            'Keep Task'
+        ).then((shouldDelete) => {
+            if (shouldDelete) {
+                // Delete all instances
+                this.deleteRecurringTaskInstances(taskId);
+                
+                // Remove from recurring tasks list
+                const updatedTasks = recurringTasks.filter(t => t.id !== taskId);
+                localStorage.setItem('recurringTasks', JSON.stringify(updatedTasks));
+                
+                this.loadRecurringTasks();
+                this.showFeedback(`Recurring task "${task.text}" deleted successfully.`);
+            }
+        });
     }
 
     deleteAllRecurringTasks() {
@@ -7615,18 +8140,24 @@ class DailyTodoApp {
             return;
         }
         
-        if (confirm(`Delete ALL ${recurringTasks.length} recurring tasks?\n\nThis will permanently delete all recurring tasks and all their instances across all dates.\n\nThis action cannot be undone.`)) {
-            // Delete all instances for each recurring task
-            recurringTasks.forEach(task => {
-                this.deleteRecurringTaskInstances(task.id);
-            });
-            
-            // Clear the recurring tasks list
-            localStorage.setItem('recurringTasks', JSON.stringify([]));
-            
-            this.loadRecurringTasks();
-            this.showFeedback(`All recurring tasks deleted successfully.`);
-        }
+        this.showCustomConfirm(
+            `Delete ALL ${recurringTasks.length} recurring tasks?\n\nThis will permanently delete all recurring tasks and all their instances across all dates.\n\nThis action cannot be undone.`,
+            'Delete All Tasks',
+            'Keep Tasks'
+        ).then((shouldDeleteAll) => {
+            if (shouldDeleteAll) {
+                // Delete all instances for each recurring task
+                recurringTasks.forEach(task => {
+                    this.deleteRecurringTaskInstances(task.id);
+                });
+                
+                // Clear the recurring tasks list
+                localStorage.setItem('recurringTasks', JSON.stringify([]));
+                
+                this.loadRecurringTasks();
+                this.showFeedback(`All recurring tasks deleted successfully.`);
+            }
+        });
     }
     
 
@@ -7780,10 +8311,10 @@ class DailyTodoApp {
         return supported;
     }
     
-    async performAutosave() {
+    async performAutosave(manualSave = false) {
         try {
-            // First check if autosave is actually enabled
-            if (!this.autosaveEnabled || localStorage.getItem('autosaveEnabled') !== 'true') {
+            // First check if autosave is actually enabled (skip this check for manual saves)
+            if (!manualSave && (!this.autosaveEnabled || localStorage.getItem('autosaveEnabled') !== 'true')) {
                 return;
             }
             
@@ -7795,8 +8326,22 @@ class DailyTodoApp {
                     if (savedPath) {
                         this.autosaveFilePath = savedPath;
                     } else {
-                        console.log('No autosave file selected yet');
-                        return;
+                        if (manualSave) {
+                            // For manual save, prompt user to select file
+                            try {
+                                await this.selectAutosaveFile();
+                                if (!this.autosaveFilePath) {
+                                    this.showFeedback('No file selected - save cancelled', 'error');
+                                    return;
+                                }
+                            } catch (error) {
+                                this.showFeedback('No file selected - save cancelled', 'error');
+                                return;
+                            }
+                        } else {
+                            console.log('No autosave file selected yet');
+                            return;
+                        }
                     }
                 }
             } else {
@@ -7806,8 +8351,22 @@ class DailyTodoApp {
                     if (savedHandle) {
                         this.autosaveFileHandle = savedHandle;
                     } else {
-                        console.log('No autosave file selected yet');
-                        return;
+                        if (manualSave) {
+                            // For manual save, prompt user to select file
+                            try {
+                                await this.selectAutosaveFile();
+                                if (!this.autosaveFileHandle) {
+                                    this.showFeedback('No file selected - save cancelled', 'error');
+                                    return;
+                                }
+                            } catch (error) {
+                                this.showFeedback('No file selected - save cancelled', 'error');
+                                return;
+                            }
+                        } else {
+                            console.log('No autosave file selected yet');
+                            return;
+                        }
                     }
                 }
             }
@@ -8104,14 +8663,37 @@ class DailyTodoApp {
         }
         
         try {
-            const savedHandle = await this.getStoredFileHandle();
-            if (savedHandle) {
+            let hasValidFile = false;
+            let fileName = '';
+            
+            if (this.isElectronMode()) {
+                // Check for Electron mode file path
+                const savedPath = await window.electronAPI.getStoredFilePath();
+                if (savedPath) {
+                    hasValidFile = true;
+                    // Extract filename from path
+                    fileName = savedPath.split(/[\\/]/).pop();
+                    // Update instance property
+                    this.autosaveFilePath = savedPath;
+                }
+            } else {
+                // Check for browser mode file handle
+                const savedHandle = await this.getStoredFileHandle();
+                if (savedHandle) {
+                    hasValidFile = true;
+                    fileName = savedHandle.name;
+                    // Update instance property
+                    this.autosaveFileHandle = savedHandle;
+                }
+            }
+            
+            if (hasValidFile) {
                 // Get the current interval setting
                 const savedInterval = localStorage.getItem('autosaveInterval');
                 const intervalMs = savedInterval ? parseInt(savedInterval) : 60000;
                 const intervalText = this.getIntervalText(intervalMs);
                 
-                let statusText = `Autosave status: Configured ${intervalText} (${savedHandle.name})`;
+                let statusText = `Autosave status: Configured ${intervalText} (${fileName})`;
                 
                 // Add last autosave time if available
                 const lastAutosaveTime = localStorage.getItem('lastAutosaveTime');
@@ -8861,23 +9443,46 @@ class DailyTodoApp {
         this.savePomodoroState();
     }
     
-    showPomodoroNotification() {
-        if (this.pomodoroNotifications.checked && 'Notification' in window && Notification.permission === 'granted') {
-            let title, body;
-            
-            if (this.pomodoroMode === 'work') {
-                if (this.pomodoroCompletedSessions % 4 === 0) {
-                    title = 'Work Session Complete! 🎉';
-                    body = 'Time for a long break! You\'ve earned it.';
-                } else {
-                    title = 'Work Session Complete! ✅';
-                    body = 'Time for a short break!';
-                }
+    async showPomodoroNotification() {
+        if (!this.pomodoroNotifications.checked) {
+            return;
+        }
+        
+        let title, body;
+        
+        if (this.pomodoroMode === 'work') {
+            if (this.pomodoroCompletedSessions % 4 === 0) {
+                title = 'Work Session Complete! 🎉';
+                body = 'Time for a long break! You\'ve earned it.';
             } else {
-                title = 'Break Complete! 💪';
-                body = 'Ready to get back to work?';
+                title = 'Work Session Complete! ✅';
+                body = 'Time for a short break!';
             }
-            
+        } else {
+            title = 'Break Complete! 💪';
+            body = 'Ready to get back to work?';
+        }
+        
+        if (this.isElectronMode()) {
+            // Use Electron's native notifications
+            try {
+                await window.electronAPI.showNotification(title, {
+                    body: body,
+                    silent: false
+                });
+            } catch (error) {
+                console.error('Electron notification failed:', error);
+                // Fallback to web notification
+                this.showWebNotification(title, body);
+            }
+        } else {
+            // Use web notifications
+            this.showWebNotification(title, body);
+        }
+    }
+    
+    showWebNotification(title, body) {
+        if ('Notification' in window && Notification.permission === 'granted') {
             new Notification(title, {
                 body: body,
                 icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23e74c3c"/><text x="32" y="40" text-anchor="middle" fill="white" font-size="24">🍅</text></svg>'

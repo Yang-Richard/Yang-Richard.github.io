@@ -225,3 +225,75 @@ ipcMain.handle('clear-stored-file-path', () => {
     autosaveFilePath = null;
     return { success: true };
 });
+
+// Export functionality
+ipcMain.handle('select-export-file', async () => {
+    const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export Todo Data',
+        defaultPath: `daily-todos-${new Date().toISOString().split('T')[0]}.json`,
+        filters: [
+            { name: 'JSON Files', extensions: ['json'] },
+            { name: 'All Files', extensions: ['*'] }
+        ]
+    });
+    
+    if (!result.canceled) {
+        return result.filePath;
+    }
+    return null;
+});
+
+// Import functionality
+ipcMain.handle('select-import-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Import Todo Data',
+        filters: [
+            { name: 'JSON Files', extensions: ['json'] },
+            { name: 'CSV Files', extensions: ['csv'] },
+            { name: 'Text Files', extensions: ['txt'] },
+            { name: 'All Files', extensions: ['*'] }
+        ],
+        properties: ['openFile']
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+        try {
+            const filePath = result.filePaths[0];
+            const data = await fs.readFile(filePath, 'utf8');
+            return { 
+                success: true, 
+                data: data, 
+                filePath: filePath,
+                fileName: path.basename(filePath)
+            };
+        } catch (error) {
+            console.error('Error reading import file:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    return { success: false, error: 'No file selected' };
+});
+
+// Native notification support
+ipcMain.handle('show-notification', async (event, title, options) => {
+    try {
+        const { Notification } = require('electron');
+        
+        if (Notification.isSupported()) {
+            const notification = new Notification({
+                title: title,
+                body: options.body || '',
+                icon: options.icon || path.join(__dirname, 'build/icon.ico'), // Use app icon as fallback
+                silent: options.silent || false
+            });
+            
+            notification.show();
+            return { success: true };
+        } else {
+            return { success: false, error: 'Notifications not supported' };
+        }
+    } catch (error) {
+        console.error('Error showing notification:', error);
+        return { success: false, error: error.message };
+    }
+});

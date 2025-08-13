@@ -4,9 +4,10 @@ window.ChangelogContent = {
         return `
             <br>
             <div class="changelog-entries">
-                <p><strong>v6.0 - 2025-08-11</strong></p>
+                <p><strong>v6.1 - 2025-08-11</strong></p>
                 <ul>
                     <li>Windows electron app support</li>
+                    <li>Custom prompts</li>
                     <li>Bug fixes </li>
                 </ul>
                 <br>
@@ -15,7 +16,7 @@ window.ChangelogContent = {
                     <li>Keyboard shortcuts</li>
                     <li>Pomodoro</li>
                     <li>More stats</li>
-                    <li>Add items directly to today/sections</li>
+                    <li>Add items directly to today or in sections</li>
                     <li>Bug fixes </li>
                 </ul>
                 <br>

@@ -18,5 +18,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readFromFile: (filePath) => ipcRenderer.invoke('read-from-file', filePath),
     getStoredFilePath: () => ipcRenderer.invoke('get-stored-file-path'),
     setStoredFilePath: (filePath) => ipcRenderer.invoke('set-stored-file-path', filePath),
-    clearStoredFilePath: () => ipcRenderer.invoke('clear-stored-file-path')
+    clearStoredFilePath: () => ipcRenderer.invoke('clear-stored-file-path'),
+    
+    // File operations for export/import
+    selectExportFile: () => ipcRenderer.invoke('select-export-file'),
+    selectImportFile: () => ipcRenderer.invoke('select-import-file'),
+    
+    // Notification support
+    showNotification: (title, options) => ipcRenderer.invoke('show-notification', title, options)
 });

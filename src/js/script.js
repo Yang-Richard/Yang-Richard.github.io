@@ -163,6 +163,9 @@ class DailyTodoApp {
         this.autoScrollInterval = null;
         this.isNearEdge = false;
         
+        // Flag to prevent multiple move-to-next-day dialogs
+        this.moveToNextDayInProgress = false;
+        
         this.init();
     }
     
@@ -377,6 +380,46 @@ class DailyTodoApp {
         
         // Initialize Pomodoro timer
         this.initPomodoro();
+        
+        // Fix for Electron: Ensure text inputs remain focusable after drag operations
+        this.setupElectronDragFix();
+    }
+    
+    setupElectronDragFix() {
+        // Periodically check and fix input elements in case they become unresponsive
+        const inputs = [this.todoInput, this.backburnerInput, this.recurringTaskInput, this.notesTextarea, this.dailyNotesTextarea];
+        
+        // Add focus event listeners to ensure inputs are always interactive
+        inputs.forEach(input => {
+            if (!input) return;
+            
+            // Force enable interaction on focus attempt
+            input.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                input.style.pointerEvents = 'auto';
+                input.style.userSelect = 'text';
+                input.disabled = false;
+            });
+            
+            input.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                input.style.pointerEvents = 'auto';
+                input.style.userSelect = 'text';
+                input.disabled = false;
+            });
+        });
+        
+        // Global drag end listener to ensure inputs remain interactive
+        document.addEventListener('dragend', () => {
+            setTimeout(() => {
+                inputs.forEach(input => {
+                    if (!input) return;
+                    input.style.pointerEvents = '';
+                    input.style.userSelect = '';
+                    input.disabled = false;
+                });
+            }, 100);
+        });
     }
     
     initKeyboardShortcuts() {
@@ -443,13 +486,13 @@ class DailyTodoApp {
                 const isTodoPanel = !this.todoPanel.classList.contains('hidden');
                 
                 switch(e.key) {
-                    case 'h':
-                        if (isTodoPanel) {
-                            e.preventDefault();
-                            this.changeDay(-1);
-                            this.showFeedback('Previous day', 'success');
-                        }
-                        break;
+                    //case 'h':
+                    //    if (isTodoPanel) {
+                    //        e.preventDefault();
+                    //        this.changeDay(-1);
+                    //        this.showFeedback('Previous day', 'success');
+                    //    }
+                    //    break;
                     case 'ArrowLeft':
                         if (isTodoPanel) {
                             e.preventDefault();
@@ -457,13 +500,13 @@ class DailyTodoApp {
                             this.showFeedback('Previous day', 'success');
                         }
                         break;
-                    case 'l':
-                        if (isTodoPanel) {
-                            e.preventDefault();
-                            this.changeDay(1);
-                            this.showFeedback('Next day', 'success');
-                        }
-                        break;
+                    //case 'l':
+                    //    if (isTodoPanel) {
+                    //        e.preventDefault();
+                    //        this.changeDay(1);
+                    //        this.showFeedback('Next day', 'success');
+                    //    }
+                    //    break;
                     case 'ArrowRight':
                         if (isTodoPanel) {
                             e.preventDefault();
@@ -471,13 +514,13 @@ class DailyTodoApp {
                             this.showFeedback('Next day', 'success');
                         }
                         break;
-                    case 'j':
-                        if (isTodoPanel) {
-                            e.preventDefault();
-                            this.goToNextWeek();
-                            this.showFeedback('Next week', 'success');
-                        }
-                        break;
+                    //case 'j':
+                    //    if (isTodoPanel) {
+                    //        e.preventDefault();
+                    //        this.goToNextWeek();
+                    //        this.showFeedback('Next week', 'success');
+                    //    }
+                    //    break;
                     case 'ArrowDown':
                         if (isTodoPanel) {
                             e.preventDefault();
@@ -485,13 +528,13 @@ class DailyTodoApp {
                             this.showFeedback('Next week', 'success');
                         }
                         break;
-                    case 'k':
-                        if (isTodoPanel) {
-                            e.preventDefault();
-                            this.goToLastWeek();
-                            this.showFeedback('Previous week', 'success');
-                        }
-                        break;
+                    //case 'k':
+                    //    if (isTodoPanel) {
+                    //        e.preventDefault();
+                    //        this.goToLastWeek();
+                    //        this.showFeedback('Previous week', 'success');
+                    //    }
+                    //    break;
                     case 'ArrowUp':
                         if (isTodoPanel) {
                             e.preventDefault();
@@ -507,12 +550,19 @@ class DailyTodoApp {
                         }
                         break;
                     case 's':
-                        e.preventDefault();
-                        this.createNewSection();
+                        // Only allow section creation on todo and later panels
+                        const isTodoOrLaterPanel = !this.todoPanel.classList.contains('hidden') || !this.backburnerPanel.classList.contains('hidden');
+                        if (isTodoOrLaterPanel) {
+                            e.preventDefault();
+                            this.createNewSection();
+                        }
                         break;
                     case 'n':
-                        e.preventDefault();
-                        this.moveKanbanToNextDay();
+                        // Only allow move to next day on todo panel and prevent multiple dialogs
+                        if (isTodoPanel && !this.moveToNextDayInProgress) {
+                            e.preventDefault();
+                            this.moveKanbanToNextDay();
+                        }
                         break;
                     case 'a':
                         e.preventDefault();
@@ -740,12 +790,43 @@ class DailyTodoApp {
     }
     
     loadItemCounter() {
-        const saved = localStorage.getItem('itemCounter');
+        const saved = this.safeGetItem('itemCounter');
         return saved ? parseInt(saved) : 1;
     }
     
+    // Safe localStorage operations with error handling
+    safeGetItem(key, defaultValue = null) {
+        try {
+            return localStorage.getItem(key) || defaultValue;
+        } catch (error) {
+            console.error(`Error getting localStorage item '${key}':`, error);
+            this.showFeedback('Storage error: Unable to read data', 'error');
+            return defaultValue;
+        }
+    }
+    
+    safeSetItem(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (error) {
+            console.error(`Error setting localStorage item '${key}':`, error);
+            this.showFeedback('Storage error: Unable to save data. Storage may be full.', 'error');
+            return false;
+        }
+    }
+    
+    safeParseJSON(str, defaultValue = null) {
+        try {
+            return JSON.parse(str);
+        } catch (error) {
+            console.error('Error parsing JSON:', error);
+            return defaultValue;
+        }
+    }
+
     saveItemCounter() {
-        localStorage.setItem('itemCounter', this.itemCounter.toString());
+        this.safeSetItem('itemCounter', this.itemCounter.toString());
     }
     
     getNextItemId() {
@@ -2417,7 +2498,8 @@ class DailyTodoApp {
         
         const diffTime = this.currentDate.getTime() - today.getTime();
         const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-        const diffWeeks = Math.round(diffDays / 7);
+        const diffWeeks = Math.floor(Math.abs(diffDays) / 7);
+        const remainingDays = Math.abs(diffDays) % 7;
         
         let relativeText = '';
         
@@ -2425,10 +2507,14 @@ class DailyTodoApp {
             relativeText = diffDays > 0 ? '1 day after today' : '1 day before today';
         } else if (Math.abs(diffDays) < 7) {
             relativeText = diffDays > 0 ? `${diffDays} days after today` : `${Math.abs(diffDays)} days before today`;
-        } else if (Math.abs(diffWeeks) === 1) {
-            relativeText = diffWeeks > 0 ? '1 week after today' : '1 week before today';
         } else {
-            relativeText = diffWeeks > 0 ? `${diffWeeks} weeks after today` : `${Math.abs(diffWeeks)} weeks before today`;
+            // Format weeks with days
+            let weekText = diffWeeks === 1 ? '1 week' : `${diffWeeks} weeks`;
+            if (remainingDays > 0) {
+                let dayText = remainingDays === 1 ? '1 day' : `${remainingDays} days`;
+                weekText += `, ${dayText}`;
+            }
+            relativeText = diffDays > 0 ? `${weekText} after today` : `${weekText} before today`;
         }
         
         this.relativeDateInfoElement.textContent = relativeText;
@@ -3061,6 +3147,9 @@ class DailyTodoApp {
         if (this.inProgressItems && this.inProgressItems.contains(item)) return 'inProgress';
         if (this.doneItems && this.doneItems.contains(item)) return 'done';
         
+        // Check for backburner unsorted items
+        if (this.backburnerUnsortedItems && this.backburnerUnsortedItems.contains(item)) return 'backburner_unsorted';
+        
         // Check if item is in a section column
         const sectionColumn = item.closest('.section-column');
         if (sectionColumn) {
@@ -3076,6 +3165,7 @@ class DailyTodoApp {
             if (parent.id === 'todoItems') return 'todo';
             if (parent.id === 'inProgressItems') return 'inProgress';
             if (parent.id === 'doneItems') return 'done';
+            if (parent.id === 'backburnerUnsortedItems') return 'backburner_unsorted';
         }
         
         return 'unsorted';
@@ -3607,6 +3697,8 @@ class DailyTodoApp {
             dueDate: item.dueDate || null,
             panel: item.panel || 'todo',
             highPriority: item.highPriority === true || item.highPriority === 'true',
+            recurringTaskId: item.recurringTaskId || null,
+            deletedAt: item.deletedAt || null,
             completedAt: item.completedAt || null,
             priority: item.priority || null,
             tags: item.tags || null,
@@ -3621,8 +3713,10 @@ class DailyTodoApp {
             text: item.text || 'Untitled Item',
             createdAt: item.createdAt || new Date().toISOString(),
             sectionId: item.sectionId || null,
+            sectionName: item.sectionName || null,
             dueDate: item.dueDate || null,
             highPriority: item.highPriority === true || item.highPriority === 'true',
+            recurringTaskId: item.recurringTaskId || null,
             panel: item.panel || 'todo',
             originalColumnType: item.originalColumnType || 'todo',
             deletedAt: item.deletedAt || new Date().toISOString(),
@@ -3663,6 +3757,11 @@ class DailyTodoApp {
         reader.onload = async (e) => {
             try {
                 const rawData = JSON.parse(e.target.result);
+                
+                // Validate imported data structure
+                if (!rawData || typeof rawData !== 'object') {
+                    throw new Error('Invalid JSON data: not an object');
+                }
                 
                 // Add backwards compatibility defaults
                 const importedData = this.normalizeImportData(rawData);
@@ -3912,7 +4011,7 @@ class DailyTodoApp {
             
             todos.sections[sectionId][columnKey].push({
                 text: item.text,
-                id: itemElement.dataset.itemId,
+                id: itemElement.id,
                 itemId: itemElement.dataset.itemId,
                 dueDate: item.due_date || null,
                 createdAt: itemElement.dataset.createdAt,
@@ -3995,7 +4094,7 @@ class DailyTodoApp {
             
             backburnerData.sections[sectionId][columnKey].push({
                 text: item.text,
-                id: itemElement.dataset.itemId,
+                id: itemElement.id,
                 itemId: itemElement.dataset.itemId,
                 dueDate: item.due_date || null,
                 createdAt: itemElement.dataset.createdAt,
@@ -4008,7 +4107,7 @@ class DailyTodoApp {
             if (!backburnerData.unsortedItems) backburnerData.unsortedItems = [];
             backburnerData.unsortedItems.push({
                 text: item.text,
-                id: itemElement.dataset.itemId,
+                id: itemElement.id,
                 itemId: itemElement.dataset.itemId,
                 dueDate: item.due_date || null,
                 createdAt: itemElement.dataset.createdAt,
@@ -4561,21 +4660,91 @@ class DailyTodoApp {
         });
         
         const shouldDelete = await this.showCustomConfirm(
-            `⚠️ DELETE CURRENT DAY?\n\nThis will permanently delete all todos for:\n${dateDisplay}\n\nThis action cannot be undone.`,
-            'Delete Day',
-            'Keep Day'
+            `⚠️ MOVE DAY TO TRASH?\n\nThis will move all todos for:\n${dateDisplay}\n\nto the trash. You can restore them later from the trash panel.`,
+            'Move to Trash',
+            'Cancel'
         );
         if (shouldDelete) {
-            const finalConfirm = await this.showCustomConfirm(
-                `🚨 FINAL CONFIRMATION\n\nAre you absolutely sure you want to delete all todos for ${dateDisplay}?\n\nThis will DELETE everything for this day!`,
-                'Yes, Delete Day',
-                'No, Keep Day'
-            );
-            if (finalConfirm) {
-                localStorage.removeItem(`dailyTodos_${dateKey}`);
-                this.loadTodosForDate();
-                this.showFeedback(`Deleted all todos for ${dateDisplay}`);
+            // Get the saved data for the current day
+            const todosData = JSON.parse(localStorage.getItem(`dailyTodos_${dateKey}`) || '{}');
+            const trashData = JSON.parse(localStorage.getItem('dailyTodos_trash') || '[]');
+            
+            let itemCount = 0;
+            
+            // Process main columns
+            ['todo', 'inProgress', 'done'].forEach(column => {
+                if (todosData[column] && Array.isArray(todosData[column])) {
+                    todosData[column].forEach(item => {
+                        const newTrashItem = {
+                            id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            itemId: item.id,
+                            text: item.text,
+                            createdAt: item.createdAt,
+                            sectionId: null,
+                            sectionName: null,
+                            dueDate: item.dueDate || null,
+                            highPriority: item.highPriority || false,
+                            recurringTaskId: item.recurringTaskId || null,
+                            panel: 'todo',
+                            originalColumnType: column,
+                            deletedAt: new Date().toISOString(),
+                            originalDate: this.currentDate.toISOString().split('T')[0]
+                        };
+                        trashData.push(newTrashItem);
+                        itemCount++;
+                    });
+                }
+            });
+            
+            // Process sections
+            if (todosData.sections && typeof todosData.sections === 'object') {
+                Object.entries(todosData.sections).forEach(([sectionId, section]) => {
+                    ['todo', 'inProgress', 'done'].forEach(column => {
+                        if (section[column] && Array.isArray(section[column])) {
+                            section[column].forEach(item => {
+                                const sectionName = todosData.sectionNames && todosData.sectionNames[sectionId] 
+                                    ? todosData.sectionNames[sectionId] 
+                                    : this.getSectionName(sectionId);
+                                const newTrashItem = {
+                                    id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                    itemId: item.id,
+                                    text: item.text,
+                                    createdAt: item.createdAt,
+                                    sectionId: sectionId,
+                                    sectionName: sectionName,
+                                    dueDate: item.dueDate || null,
+                                    highPriority: item.highPriority || false,
+                                    recurringTaskId: item.recurringTaskId || null,
+                                    panel: 'todo',
+                                    originalColumnType: column,
+                                    deletedAt: new Date().toISOString(),
+                                    originalDate: this.currentDate.toISOString().split('T')[0]
+                                };
+                                trashData.push(newTrashItem);
+                                itemCount++;
+                            });
+                        }
+                    });
+                });
             }
+            
+            if (itemCount === 0) {
+                this.showFeedback('No items to move to trash');
+                return;
+            }
+            
+            // Capture state for undo
+            this.captureStateForUndo('deleteDay', `Move all items from ${dateDisplay} to trash`);
+            
+            // Clear the day's data and save trash
+            localStorage.removeItem(`dailyTodos_${dateKey}`);
+            localStorage.setItem('dailyTodos_trash', JSON.stringify(trashData));
+            
+            // Reload the current view
+            this.loadTodosForDate();
+            this.updateCalendarColors();
+            
+            this.showFeedback(`Moved ${itemCount} item${itemCount !== 1 ? 's' : ''} from ${dateDisplay} to trash`);
         }
     }
     
@@ -4595,29 +4764,96 @@ class DailyTodoApp {
         const weekRange = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
         
         const shouldDelete = await this.showCustomConfirm(
-            `⚠️ DELETE CURRENT WEEK?\n\nThis will permanently delete all todos for the week:\n${weekRange}\n\nThis includes all 7 days and cannot be undone.`,
-            'Delete Week',
-            'Keep Week'
+            `⚠️ MOVE WEEK TO TRASH?\n\nThis will move all todos for the week:\n${weekRange}\n\nto the trash. You can restore them later from the trash panel.`,
+            'Move to Trash',
+            'Cancel'
         );
         if (shouldDelete) {
-            const finalConfirm = await this.showCustomConfirm(
-                `🚨 FINAL CONFIRMATION\n\nAre you absolutely sure you want to delete the entire week (${weekRange})?\n\nThis will delete ALL todos for 7 days!`,
-                'Yes, Delete Week',
-                'No, Keep Week'
-            );
-            if (finalConfirm) {
-                let deletedDays = 0;
-                weekDates.forEach(date => {
-                    const dateKey = date.toISOString().split('T')[0];
-                    if (localStorage.getItem(`dailyTodos_${dateKey}`)) {
-                        localStorage.removeItem(`dailyTodos_${dateKey}`);
-                        deletedDays++;
+            // Capture state for undo
+            this.captureStateForUndo('deleteWeek', `Move all items from week ${weekRange} to trash`);
+            
+            const trashData = JSON.parse(localStorage.getItem('dailyTodos_trash') || '[]');
+            let totalItemsMoved = 0;
+            
+            // Process each day of the week
+            for (const date of weekDates) {
+                const dateKey = date.toISOString().split('T')[0];
+                const todosData = JSON.parse(localStorage.getItem(`dailyTodos_${dateKey}`) || '{}');
+                
+                // Process main columns
+                ['todo', 'inProgress', 'done'].forEach(column => {
+                    if (todosData[column] && Array.isArray(todosData[column])) {
+                        todosData[column].forEach(item => {
+                            const newTrashItem = {
+                                id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                itemId: item.id,
+                                text: item.text,
+                                createdAt: item.createdAt,
+                                sectionId: null,
+                                sectionName: null,
+                                dueDate: item.dueDate || null,
+                                highPriority: item.highPriority || false,
+                                recurringTaskId: item.recurringTaskId || null,
+                                panel: 'todo',
+                                originalColumnType: column,
+                                deletedAt: new Date().toISOString(),
+                                originalDate: dateKey
+                            };
+                            trashData.push(newTrashItem);
+                            totalItemsMoved++;
+                        });
                     }
                 });
                 
-                this.loadTodosForDate();
-                this.updateCalendarColors();
-                this.showFeedback(`Deleted ${deletedDays} days from week ${weekRange}`);
+                // Process sections
+                if (todosData.sections && typeof todosData.sections === 'object') {
+                    Object.entries(todosData.sections).forEach(([sectionId, section]) => {
+                        ['todo', 'inProgress', 'done'].forEach(column => {
+                            if (section[column] && Array.isArray(section[column])) {
+                                section[column].forEach(item => {
+                                    const sectionName = todosData.sectionNames && todosData.sectionNames[sectionId] 
+                                        ? todosData.sectionNames[sectionId] 
+                                        : this.getSectionName(sectionId);
+                                    const newTrashItem = {
+                                        id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                        itemId: item.id,
+                                        text: item.text,
+                                        createdAt: item.createdAt,
+                                        sectionId: sectionId,
+                                        sectionName: sectionName,
+                                        dueDate: item.dueDate || null,
+                                        highPriority: item.highPriority || false,
+                                        recurringTaskId: item.recurringTaskId || null,
+                                        panel: 'todo',
+                                        originalColumnType: column,
+                                        deletedAt: new Date().toISOString(),
+                                        originalDate: dateKey
+                                    };
+                                    trashData.push(newTrashItem);
+                                    totalItemsMoved++;
+                                });
+                            }
+                        });
+                    });
+                }
+                
+                // Clear this day's data if any items were moved
+                if (localStorage.getItem(`dailyTodos_${dateKey}`)) {
+                    localStorage.removeItem(`dailyTodos_${dateKey}`);
+                }
+            }
+            
+            // Save updated trash data
+            localStorage.setItem('dailyTodos_trash', JSON.stringify(trashData));
+            
+            // Reload the current view
+            this.loadTodosForDate();
+            this.updateCalendarColors();
+            
+            if (totalItemsMoved > 0) {
+                this.showFeedback(`Moved ${totalItemsMoved} item${totalItemsMoved !== 1 ? 's' : ''} from week ${weekRange} to trash`);
+            } else {
+                this.showFeedback('No items to move to trash for this week');
             }
         }
     }
@@ -4821,6 +5057,9 @@ class DailyTodoApp {
             // Stop propagation to prevent section drag from interfering
             e.stopPropagation();
             
+            // Fix for Electron: Set dropEffect to move
+            e.dataTransfer.effectAllowed = 'move';
+            
             // Start auto-scroll functionality
             document.addEventListener('dragover', this.handleAutoScrollDragOver.bind(this));
         }
@@ -4836,10 +5075,30 @@ class DailyTodoApp {
         document.querySelectorAll('.drag-over').forEach(element => {
             element.classList.remove('drag-over');
         });
+        document.querySelectorAll('.drag-over-later-return').forEach(element => {
+            element.classList.remove('drag-over-later-return');
+        });
         
         // Stop auto-scroll functionality
         this.stopAutoScroll();
         document.removeEventListener('dragover', this.handleAutoScrollDragOver.bind(this));
+        
+        // Fix for Electron: Ensure text inputs remain interactive after drag
+        // Remove any drag-related attributes that might interfere
+        document.querySelectorAll('[draggable]').forEach(el => {
+            if (el.hasAttribute('draggable')) {
+                el.setAttribute('draggable', 'true');
+            }
+        });
+        
+        // Force a reflow to ensure the DOM updates properly
+        void document.body.offsetHeight;
+        
+        // Re-enable pointer events on all interactive elements
+        document.querySelectorAll('input, textarea, button, select').forEach(el => {
+            el.style.pointerEvents = '';
+            el.style.userSelect = '';
+        });
     }
     
     handleDragOver(e) {
@@ -4862,12 +5121,25 @@ class DailyTodoApp {
         e.preventDefault();
         if (e.target.classList.contains('items')) {
             e.target.parentElement.classList.add('drag-over');
+            
+            // Special hover indicator when moving from backburner section "later" column to main "later" bar
+            const draggedItem = document.querySelector('.todo-item.dragging');
+            if (draggedItem) {
+                const draggedFromBackburnerSection = draggedItem.closest('.section-row[data-panel="backburner"]') && 
+                                                   draggedItem.closest('.section-todo');
+                const droppingOnMainBackburnerBar = e.target.id === 'backburnerUnsortedItems';
+                
+                if (draggedFromBackburnerSection && droppingOnMainBackburnerBar) {
+                    e.target.parentElement.classList.add('drag-over-later-return');
+                }
+            }
         }
     }
     
     handleDragLeave(e) {
         if (e.target.classList.contains('items') && !e.target.contains(e.relatedTarget)) {
             e.target.parentElement.classList.remove('drag-over');
+            e.target.parentElement.classList.remove('drag-over-later-return');
         }
     }
     
@@ -5018,6 +5290,14 @@ class DailyTodoApp {
             
             this.updateAllItemCounts();
         }
+        
+        // Clean up any lingering drag-over classes after drop
+        document.querySelectorAll('.drag-over').forEach(element => {
+            element.classList.remove('drag-over');
+        });
+        document.querySelectorAll('.drag-over-later-return').forEach(element => {
+            element.classList.remove('drag-over-later-return');
+        });
     }
     
     handleWeekButtonDragOver(e) {
@@ -5482,7 +5762,7 @@ class DailyTodoApp {
                     backburnerData.sections[sectionId].todo.push(restoredItem);
                 }
             } else {
-                // Restore to misc items
+                // Restore to misc items (handle both backburner_unsorted and regular unsorted)
                 backburnerData.unsortedItems.push(restoredItem);
             }
             
@@ -5561,6 +5841,21 @@ class DailyTodoApp {
                     const globalUnsorted = JSON.parse(localStorage.getItem('globalUnsortedItems') || '[]');
                     globalUnsorted.push(restoredItem);
                     localStorage.setItem('globalUnsortedItems', JSON.stringify(globalUnsorted));
+                } else if (restoreColumnType === 'backburner_unsorted') {
+                    // This was a backburner item, redirect to backburner panel
+                    console.warn('Redirecting backburner_unsorted item to backburner panel');
+                    // Don't add to todos, handle as backburner item instead
+                    const backburnerData = JSON.parse(localStorage.getItem('backburnerItems') || '{"unsortedItems": [], "sections": {}}');
+                    const backburnerItem = { ...restoredItem };
+                    backburnerData.unsortedItems.push(backburnerItem);
+                    localStorage.setItem('backburnerItems', JSON.stringify(backburnerData));
+                    
+                    // If on backburner panel, reload it
+                    if (!this.backburnerPanel.classList.contains('hidden')) {
+                        this.loadBackburnerItems();
+                    }
+                    this.showFeedback('Item restored to backburner');
+                    return; // Early return to avoid double processing
                 } else if (restoreColumnType === 'inProgress') {
                     todos.inProgress.push(restoredItem);
                 } else if (restoreColumnType === 'done') {
@@ -5624,7 +5919,20 @@ class DailyTodoApp {
                 }
             } else {
                 // Restore to appropriate main column based on original column type
-                if (originalColumnType === 'inProgress') {
+                if (originalColumnType === 'backburner_unsorted') {
+                    // This should be restored to backburner instead of todo panel
+                    console.warn('Creating backburner item for backburner_unsorted restore');
+                    newItem.remove(); // Remove the todo item we just created
+                    
+                    // Create as backburner item instead
+                    const backburnerItem = this.createTodoItem(text, null, createdAt, sectionId, itemId, dueDate, 'backburner', isHighPriority, recurringTaskId);
+                    this.backburnerUnsortedItems.appendChild(backburnerItem);
+                    
+                    // Save to backburner storage
+                    this.saveBackburnerItems();
+                    this.showFeedback('Item restored to backburner');
+                    return; // Early return
+                } else if (originalColumnType === 'inProgress') {
                     targetColumn = this.inProgressItems;
                 } else if (originalColumnType === 'done') {
                     targetColumn = this.doneItems;
@@ -5654,7 +5962,7 @@ class DailyTodoApp {
         this.showFeedback('Item restored successfully');
     }
     
-    createTrashItem(text, itemId = null, sectionId = null, createdAt = null, deletedAt = null, originalDate = null, originalColumnType = null, dueDate = null, panel = 'todo', isHighPriority = false, recurringTaskId = null) {
+    createTrashItem(text, itemId = null, sectionId = null, createdAt = null, deletedAt = null, originalDate = null, originalColumnType = null, dueDate = null, panel = 'todo', isHighPriority = false, recurringTaskId = null, sectionName = null) {
         const item = document.createElement('div');
         item.className = 'todo-item trash-item';
         item.draggable = true;
@@ -5666,6 +5974,11 @@ class DailyTodoApp {
         // Preserve section ID when moving to trash
         if (sectionId) {
             item.dataset.sectionId = sectionId;
+        }
+        
+        // Preserve section name when moving to trash
+        if (sectionName) {
+            item.dataset.sectionName = sectionName;
         }
         
         // Preserve original creation timestamp or set new one
@@ -5757,6 +6070,11 @@ class DailyTodoApp {
             text: item.querySelector('.todo-text').textContent,
             createdAt: item.dataset.createdAt,
             sectionId: item.dataset.sectionId || null,
+            sectionName: item.dataset.sectionName || null,
+            dueDate: item.dataset.dueDate || null,
+            highPriority: item.dataset.highPriority === 'true',
+            panel: item.dataset.panel || 'todo',
+            recurringTaskId: item.dataset.recurringTaskId || null,
             deletedAt: item.dataset.deletedAt,
             originalDate: item.dataset.originalDate,
             originalColumnType: item.dataset.originalColumnType
@@ -5784,7 +6102,7 @@ class DailyTodoApp {
             const tempContainer = document.createElement('div');
             
             trashData.forEach(trashItem => {
-                const item = this.createTrashItem(trashItem.text, trashItem.itemId, trashItem.sectionId, trashItem.createdAt, trashItem.deletedAt, trashItem.originalDate, trashItem.originalColumnType, trashItem.dueDate, trashItem.panel || 'todo', trashItem.highPriority || false, trashItem.recurringTaskId);
+                const item = this.createTrashItem(trashItem.text, trashItem.itemId, trashItem.sectionId, trashItem.createdAt, trashItem.deletedAt, trashItem.originalDate, trashItem.originalColumnType, trashItem.dueDate, trashItem.panel || 'todo', trashItem.highPriority || false, trashItem.recurringTaskId, trashItem.sectionName);
                 item.id = trashItem.id;
                 tempContainer.appendChild(item);
             });
@@ -5938,7 +6256,8 @@ class DailyTodoApp {
                 itemData.dueDate,
                 itemData.panel || 'todo',
                 itemData.highPriority || false,
-                itemData.recurringTaskId
+                itemData.recurringTaskId,
+                itemData.sectionName
             );
             item.id = itemData.id; // Preserve the original ID
             itemsContainer.appendChild(item);
@@ -5990,7 +6309,8 @@ class DailyTodoApp {
         // Get section name if item is in a section
         let sectionInfo = '';
         if (sectionId) {
-            const sectionName = this.getSectionName(sectionId);
+            // Try to get section name from stored data first (for trash items)
+            let sectionName = item.dataset.sectionName || this.getSectionName(sectionId);
             if (sectionName) {
                 sectionInfo = `<div class="tooltip-section">Section: ${sectionName}</div>`;
             }
@@ -6090,6 +6410,39 @@ class DailyTodoApp {
             const titleElement = sectionElement.querySelector('.section-title');
             return titleElement ? titleElement.value.trim() : null;
         }
+        
+        // If not found in DOM, check stored section names from current date's data
+        const dateKey = this.getDateKey();
+        const todosData = JSON.parse(localStorage.getItem(`dailyTodos_${dateKey}`) || '{}');
+        if (todosData.sectionNames && todosData.sectionNames[sectionId]) {
+            return todosData.sectionNames[sectionId];
+        }
+        
+        // If still not found, check backburner data
+        const backburnerData = JSON.parse(localStorage.getItem('backburnerItems') || '{"unsortedItems": [], "sections": {}}');
+        if (backburnerData.sections && backburnerData.sections[sectionId]) {
+            return backburnerData.sections[sectionId].name;
+        }
+        
+        // If still not found, check all stored dates for section names
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('dailyTodos_') && key !== 'dailyTodos_trash') {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key) || '{}');
+                    if (data.sectionNames && data.sectionNames[sectionId]) {
+                        return data.sectionNames[sectionId];
+                    }
+                    // Also check sections directly
+                    if (data.sections && data.sections[sectionId]) {
+                        return data.sections[sectionId].name;
+                    }
+                } catch (e) {
+                    // Skip invalid data
+                }
+            }
+        }
+        
         return null;
     }
     
@@ -6198,14 +6551,20 @@ class DailyTodoApp {
         const timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         const sectionName = `${dateStr} ${timeStr}`;
         
-        // Create section on current day (todo panel only for new sections)
-        const sectionId = this.createSection(sectionName, null, 'todo');
+        // Detect which panel is currently active and create section in that panel
+        const currentPanel = !this.backburnerPanel.classList.contains('hidden') ? 'backburner' : 'todo';
+        const sectionId = this.createSection(sectionName, null, currentPanel);
         
-        // Save to current date storage
-        this.saveTodosForDate();
+        // Save to appropriate storage based on panel
+        if (currentPanel === 'backburner') {
+            this.saveBackburnerItems();
+        } else {
+            this.saveTodosForDate();
+        }
         this.updateAllItemCounts();
         
-        this.showFeedback(`Created new section "${sectionName}"`);
+        const panelName = currentPanel === 'backburner' ? 'LATER' : 'TODO';
+        this.showFeedback(`Created new section "${sectionName}" in ${panelName} panel`);
         return sectionId;
     }
 
@@ -6583,6 +6942,9 @@ class DailyTodoApp {
     }
     
     async moveKanbanToNextDay() {
+        // Set flag to prevent multiple dialogs
+        this.moveToNextDayInProgress = true;
+        
         const nextDate = this.getNextBusinessDay();
         const nextDateStr = this.formatDateShort(nextDate);
         
@@ -6608,6 +6970,7 @@ class DailyTodoApp {
         });
         
         if (itemCount === 0 && emptySectionsToMove === 0) {
+            this.moveToNextDayInProgress = false; // Clear flag
             alert('No items or empty sections to move.');
             return;
         }
@@ -6713,6 +7076,9 @@ class DailyTodoApp {
             this.updateCalendarColors();
             this.showFeedback(`Moved ${itemCount} items to ${nextDateStr}`);
         }
+        
+        // Clear flag when dialog is dismissed (either confirmed or canceled)
+        this.moveToNextDayInProgress = false;
     }
     
     getNextBusinessDay() {
@@ -7747,6 +8113,9 @@ class DailyTodoApp {
     }
 
     createRecurringTask() {
+        // Check if we're in edit mode
+        const isEditMode = this.editingRecurringTaskId;
+        
         const taskText = this.recurringTaskInput.value.trim();
         if (!taskText) {
             alert('Please enter a task description.');
@@ -7790,30 +8159,82 @@ class DailyTodoApp {
                 break;
         }
         
-        const recurringTask = {
-            id: this.generateRecurringId(),
-            text: taskText,
-            frequency: frequencyData,
-            dueDateOffset: parseInt(this.dueDateOffset.value),
-            startDate: startDate.toISOString().split('T')[0],
-            endDate: endDate.toISOString().split('T')[0],
-            isHighPriority: this.recurringHighPriority.checked,
-            createdAt: new Date().toISOString()
-        };
-        
-        this.showCustomConfirm(
-            `Create recurring task "${taskText}"?\n\nThis will generate tasks for the entire date range (${this.formatDateShort(startDate)} to ${this.formatDateShort(endDate)}).`,
-            'Create Task',
-            'Cancel'
-        ).then((shouldCreate) => {
-            if (shouldCreate) {
-                this.saveRecurringTask(recurringTask);
-                this.generateRecurringTaskInstances(recurringTask);
-                this.clearRecurringForm();
-                this.loadRecurringTasks();
-                this.showFeedback(`Recurring task "${taskText}" created successfully!`);
+        if (isEditMode) {
+            // Edit mode: update existing recurring task
+            const recurringTasks = JSON.parse(localStorage.getItem('recurringTasks') || '[]');
+            const taskIndex = recurringTasks.findIndex(t => t.id === this.editingRecurringTaskId);
+            
+            if (taskIndex === -1) {
+                alert('Recurring task not found.');
+                return;
             }
-        });
+            
+            const updatedTask = {
+                ...recurringTasks[taskIndex],
+                text: taskText,
+                frequency: frequencyData,
+                dueDateOffset: parseInt(this.dueDateOffset.value),
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0],
+                isHighPriority: this.recurringHighPriority.checked
+            };
+            
+            this.showCustomConfirm(
+                `Update recurring task "${taskText}"?\n\nThis will delete future instances and regenerate them with the new settings (${this.formatDateShort(startDate)} to ${this.formatDateShort(endDate)}).`,
+                'Update Task',
+                'Cancel'
+            ).then((shouldUpdate) => {
+                if (shouldUpdate) {
+                    // Delete only future instances of the old recurring task
+                    this.deleteRecurringTaskInstances(this.editingRecurringTaskId, true);
+                    
+                    // Update the recurring task definition
+                    recurringTasks[taskIndex] = updatedTask;
+                    localStorage.setItem('recurringTasks', JSON.stringify(recurringTasks));
+                    
+                    // Generate new future instances
+                    this.generateRecurringTaskInstances(updatedTask);
+                    
+                    // Clear edit mode
+                    this.editingRecurringTaskId = null;
+                    this.clearRecurringForm();
+                    this.loadRecurringTasks();
+                    this.showFeedback(`Recurring task "${taskText}" updated successfully!`);
+                    
+                    // Reset button text
+                    const createBtn = document.querySelector('#create-recurring-task');
+                    if (createBtn) {
+                        createBtn.textContent = 'Create Recurring Task';
+                    }
+                }
+            });
+        } else {
+            // Create mode: create new recurring task
+            const recurringTask = {
+                id: this.generateRecurringId(),
+                text: taskText,
+                frequency: frequencyData,
+                dueDateOffset: parseInt(this.dueDateOffset.value),
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0],
+                isHighPriority: this.recurringHighPriority.checked,
+                createdAt: new Date().toISOString()
+            };
+            
+            this.showCustomConfirm(
+                `Create recurring task "${taskText}"?\n\nThis will generate tasks for the entire date range (${this.formatDateShort(startDate)} to ${this.formatDateShort(endDate)}).`,
+                'Create Task',
+                'Cancel'
+            ).then((shouldCreate) => {
+                if (shouldCreate) {
+                    this.saveRecurringTask(recurringTask);
+                    this.generateRecurringTaskInstances(recurringTask);
+                    this.clearRecurringForm();
+                    this.loadRecurringTasks();
+                    this.showFeedback(`Recurring task "${taskText}" created successfully!`);
+                }
+            });
+        }
     }
     
     saveRecurringTask(recurringTask) {
@@ -7942,6 +8363,15 @@ class DailyTodoApp {
         this.recurringHighPriority.checked = false;
         this.setDefaultRecurringDates();
         this.autoResizeTextarea(this.recurringTaskInput);
+        
+        // Clear edit mode
+        this.editingRecurringTaskId = null;
+        
+        // Reset button text
+        const createBtn = document.querySelector('#create-recurring-task');
+        if (createBtn) {
+            createBtn.textContent = 'Create Recurring Task';
+        }
     }
     
     loadRecurringTasks() {
@@ -7973,9 +8403,11 @@ class DailyTodoApp {
         // Add event listeners to action buttons
         recurringTasks.forEach(task => {
             const editBtn = document.getElementById(`edit-recurring-${task.id}`);
+            const duplicateBtn = document.getElementById(`duplicate-recurring-${task.id}`);
             const deleteBtn = document.getElementById(`delete-recurring-${task.id}`);
             
-            if (editBtn) editBtn.addEventListener('click', () => this.editRecurringTask(task.id));
+            if (editBtn) editBtn.addEventListener('click', () => this.editRecurringTaskFuture(task.id));
+            if (duplicateBtn) duplicateBtn.addEventListener('click', () => this.duplicateRecurringTask(task.id));
             if (deleteBtn) deleteBtn.addEventListener('click', () => this.deleteRecurringTask(task.id));
         });
     }
@@ -7991,7 +8423,8 @@ class DailyTodoApp {
                     <div class="recurring-task-header-right">
                         <div class="recurring-task-id">${task.id}</div>
                         <div class="recurring-task-actions">
-                            <button id="edit-recurring-${task.id}" class="recurring-task-btn edit-recurring-btn">Duplicate</button>
+                            <button id="edit-recurring-${task.id}" class="recurring-task-btn edit-recurring-btn">Edit</button>
+                            <button id="duplicate-recurring-${task.id}" class="recurring-task-btn duplicate-recurring-btn">Duplicate</button>
                             <button id="delete-recurring-${task.id}" class="recurring-task-btn delete-recurring-btn">Delete</button>
                         </div>
                     </div>
@@ -8040,7 +8473,7 @@ class DailyTodoApp {
         this.recurringTasksCount.textContent = `${count} recurring task${count !== 1 ? 's' : ''}`;
     }
     
-    editRecurringTask(taskId) {
+    duplicateRecurringTask(taskId) {
         const recurringTasks = JSON.parse(localStorage.getItem('recurringTasks') || '[]');
         const task = recurringTasks.find(t => t.id === taskId);
         
@@ -8070,6 +8503,46 @@ class DailyTodoApp {
         
         // Keep create mode since this is now duplication
         this.showFeedback('Recurring task settings loaded for duplication. Modify as needed and click "Create Recurring Task" to create a new recurring task.');
+    }
+
+    editRecurringTaskFuture(taskId) {
+        const recurringTasks = JSON.parse(localStorage.getItem('recurringTasks') || '[]');
+        const task = recurringTasks.find(t => t.id === taskId);
+        
+        if (!task) return;
+        
+        // Populate form with task data
+        this.recurringTaskInput.value = task.text;
+        this.recurringFrequencyType.value = task.frequency.type;
+        this.updateFrequencyOptions();
+        
+        switch(task.frequency.type) {
+            case 'daily':
+                this.dailyInterval.value = task.frequency.interval;
+                break;
+            case 'weekly':
+                this.weeklyDay.value = task.frequency.dayOfWeek;
+                break;
+            case 'monthly':
+                this.monthlyDate.value = task.frequency.dayOfMonth;
+                break;
+        }
+        
+        this.dueDateOffset.value = task.dueDateOffset;
+        this.recurringStartDate.value = task.startDate;
+        this.recurringEndDate.value = task.endDate;
+        this.recurringHighPriority.checked = task.isHighPriority;
+        
+        // Store the task ID being edited
+        this.editingRecurringTaskId = taskId;
+        
+        // Change button text to indicate edit mode
+        const createBtn = document.querySelector('#create-recurring-task');
+        if (createBtn) {
+            createBtn.textContent = 'Update Recurring Task';
+        }
+        
+        this.showFeedback('Recurring task settings loaded for editing. Modify as needed and click "Update Recurring Task" to update future instances.');
     }
     
     
@@ -8114,20 +8587,20 @@ class DailyTodoApp {
         if (!task) return;
         
         this.showCustomConfirm(
-            `Delete recurring task "${task.text}"?\n\nThis will delete the recurring task definition and all instances across all dates.`,
+            `Delete recurring task "${task.text}"?\n\nThis will delete the recurring task definition and all future instances. Past instances will be preserved.`,
             'Delete Task',
             'Keep Task'
         ).then((shouldDelete) => {
             if (shouldDelete) {
-                // Delete all instances
-                this.deleteRecurringTaskInstances(taskId);
+                // Delete only future instances
+                this.deleteRecurringTaskInstances(taskId, true);
                 
                 // Remove from recurring tasks list
                 const updatedTasks = recurringTasks.filter(t => t.id !== taskId);
                 localStorage.setItem('recurringTasks', JSON.stringify(updatedTasks));
                 
                 this.loadRecurringTasks();
-                this.showFeedback(`Recurring task "${task.text}" deleted successfully.`);
+                this.showFeedback(`Recurring task "${task.text}" deleted successfully. Past instances preserved.`);
             }
         });
     }
@@ -8161,7 +8634,7 @@ class DailyTodoApp {
     }
     
 
-    deleteRecurringTaskInstances(recurringTaskId) {
+    deleteRecurringTaskInstances(recurringTaskId, futureOnly = false) {
         // Get all localStorage keys for daily todos
         const dateKeys = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -8171,8 +8644,22 @@ class DailyTodoApp {
             }
         }
         
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
         // Process each date
         dateKeys.forEach(key => {
+            // If futureOnly is true, skip dates that are in the past
+            if (futureOnly) {
+                const dateStr = key.replace('dailyTodos_', '');
+                const keyDate = new Date(dateStr);
+                keyDate.setHours(0, 0, 0, 0);
+                
+                if (keyDate < today) {
+                    return; // Skip past dates
+                }
+            }
+            
             const data = JSON.parse(localStorage.getItem(key) || '{}');
             let changed = false;
             

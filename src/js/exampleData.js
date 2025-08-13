@@ -4,7 +4,7 @@
 window.ExampleData = {
     getCsvContent: function() {
         return `text,panel,column,section_name,due_date,date,item_id,created_at,completed_at,deleted_at,original_date,high_priority,recurring_task_id
-"URGENT: Client contract review deadline",todo,"To Do","Work Projects",2025-08-08,2025-08-07,item_001,2025-08-07T08:00:00Z,,,,"true",
+"Client contract review deadline",todo,"To Do","Work Projects",2025-08-08,2025-08-07,item_001,2025-08-07T08:00:00Z,,,,"true",
 "CRITICAL: Production server maintenance",todo,"In Progress","Work Projects",2025-08-09,2025-08-07,item_002,2025-08-07T08:30:00Z,,,,"true",
 "Review Q3 project proposal",todo,"To Do","Work Projects",2025-08-10,2025-08-07,item_003,2025-08-07T09:00:00Z,,,,"true",
 "Complete design mockups for mobile app",todo,"In Progress","Work Projects",2025-08-09,2025-08-07,item_004,2025-08-07T10:30:00Z,,,,,,"Recurring 1"
@@ -13,7 +13,7 @@ window.ExampleData = {
 "Code review - authentication module",todo,"In Progress","Work Projects",,2025-08-08,item_007,2025-08-08T11:00:00Z,,,,
 "Deploy to staging environment",todo,Done,"Work Projects",,2025-08-05,item_008,2025-08-05T16:00:00Z,2025-08-05T18:30:00Z,,,,
 "Write API documentation",todo,"To Do","Work Projects",2025-08-15,2025-08-09,item_009,2025-08-09T10:00:00Z,,,,
-"URGENT: Bug fix for payment system",todo,"To Do","Work Projects",2025-08-08,2025-08-07,item_010,2025-08-07T15:00:00Z,,,,"true"
+"Bug fix for payment system",todo,"To Do","Work Projects",2025-08-08,2025-08-07,item_010,2025-08-07T15:00:00Z,,,,"true"
 "Security vulnerability patch",todo,"In Progress","Work Projects",2025-08-09,2025-08-08,item_011,2025-08-08T16:00:00Z,,,,"true"
 "Performance optimization review",todo,"To Do","Work Projects",2025-08-11,2025-08-09,item_012,2025-08-09T14:00:00Z,,,,
 "Database backup verification",todo,"In Progress","Work Projects",,2025-08-10,item_013,2025-08-10T09:00:00Z,,,,
@@ -26,13 +26,13 @@ window.ExampleData = {
 "Documentation update",todo,"To Do","Work Projects",2025-08-20,2025-08-17,item_020,2025-08-17T14:00:00Z,,,,
 
 "Buy groceries for the week",todo,"To Do","Personal Tasks",2025-08-08,2025-08-07,item_021,2025-08-07T08:15:00Z,,,,
-"URGENT: Schedule dentist appointment",todo,"To Do","Personal Tasks",2025-08-10,2025-08-08,item_022,2025-08-08T12:00:00Z,,,,"true"
+"Schedule dentist appointment",todo,"To Do","Personal Tasks",2025-08-10,2025-08-08,item_022,2025-08-08T12:00:00Z,,,,"true"
 "Pay monthly bills",todo,Done,"Personal Tasks",,2025-08-01,item_023,2025-08-01T19:00:00Z,2025-08-01T20:15:00Z,,,,
 "Organize home office",todo,"In Progress","Personal Tasks",,2025-08-09,item_024,2025-08-09T14:00:00Z,,,,
 "Call insurance company",todo,"To Do","Personal Tasks",2025-08-11,2025-08-10,item_025,2025-08-10T10:30:00Z,,,,
 "Book vacation flights",todo,"To Do","Personal Tasks",2025-08-14,2025-08-11,item_026,2025-08-11T16:00:00Z,,,,"true"
 "Clean out garage",todo,"New Items","Personal Tasks",,2025-08-12,item_027,2025-08-12T08:00:00Z,,,,
-"URGENT: Renew driver's license",todo,"To Do","Personal Tasks",2025-08-09,2025-08-08,item_028,2025-08-08T15:00:00Z,,,,"true"
+"Renew driver's license",todo,"To Do","Personal Tasks",2025-08-09,2025-08-08,item_028,2025-08-08T15:00:00Z,,,,"true"
 "Schedule home inspection",todo,"In Progress","Personal Tasks",2025-08-15,2025-08-13,item_029,2025-08-13T11:00:00Z,,,,
 "Update emergency contacts",todo,"To Do","Personal Tasks",,2025-08-14,item_030,2025-08-14T10:00:00Z,,,,
 "Organize photo albums",todo,"New Items","Personal Tasks",,2025-08-15,item_031,2025-08-15T13:00:00Z,,,,
@@ -51,7 +51,7 @@ window.ExampleData = {
 "Yoga class",todo,"To Do","Health & Fitness",2025-08-09,2025-08-09,item_043,2025-08-09T07:00:00Z,,,,
 "Track daily water intake",todo,"New Items","Health & Fitness",,2025-08-10,item_044,2025-08-10T09:00:00Z,,,,
 "Schedule annual physical",todo,"To Do","Health & Fitness",2025-08-13,2025-08-11,item_045,2025-08-11T11:00:00Z,,,,
-"URGENT: Blood work appointment",todo,"To Do","Health & Fitness",2025-08-10,2025-08-09,item_046,2025-08-09T08:00:00Z,,,,"true"
+"Blood work appointment",todo,"To Do","Health & Fitness",2025-08-10,2025-08-09,item_046,2025-08-09T08:00:00Z,,,,"true"
 "Start meditation practice",todo,"In Progress","Health & Fitness",,2025-08-12,item_047,2025-08-12T07:00:00Z,,,,
 "Plan healthy meal schedule",todo,"To Do","Health & Fitness",,2025-08-13,item_048,2025-08-13T19:00:00Z,,,,
 "Join local gym membership",todo,"New Items","Health & Fitness",,2025-08-14,item_049,2025-08-14T10:00:00Z,,,,
@@ -63,7 +63,7 @@ window.ExampleData = {
 "Plan running route",todo,"New Items","Health & Fitness",,2025-08-20,item_055,2025-08-20T06:00:00Z,,,,
 
 "Plan birthday party",todo,"In Progress","Family Events",,2025-08-12,item_056,2025-08-12T15:00:00Z,,,,
-"URGENT: Buy birthday gift for mom",todo,"To Do","Family Events",2025-08-16,2025-08-13,item_057,2025-08-13T12:00:00Z,,,,"true"
+"Buy birthday gift for mom",todo,"To Do","Family Events",2025-08-16,2025-08-13,item_057,2025-08-13T12:00:00Z,,,,"true"
 "Family dinner reservation",todo,Done,"Family Events",,2025-08-04,item_058,2025-08-04T17:00:00Z,2025-08-04T17:30:00Z,,,,
 "Pick up dry cleaning",todo,"To Do","Family Events",2025-08-10,2025-08-09,item_059,2025-08-09T13:00:00Z,,,,
 "Anniversary dinner planning",todo,"In Progress","Family Events",2025-08-20,2025-08-17,item_060,2025-08-17T16:00:00Z,,,,"true"
@@ -114,7 +114,7 @@ window.ExampleData = {
 "Fix broken kitchen faucet",todo,"New Items",,,2025-08-14,item_102,2025-08-14T10:00:00Z,,,,
 "Research vacation destinations",todo,"New Items",,,2025-08-15,item_103,2025-08-15T14:00:00Z,,,,
 "Update resume",todo,"New Items",,,2025-08-16,item_104,2025-08-16T11:00:00Z,,,,
-"URGENT: Backup computer files",todo,"New Items",,,2025-08-17,item_105,2025-08-17T16:00:00Z,,,,"true"
+"Backup computer files",todo,"New Items",,,2025-08-17,item_105,2025-08-17T16:00:00Z,,,,"true"
 "Organize digital music library",todo,"New Items",,,2025-08-18,item_106,2025-08-18T12:00:00Z,,,,
 "Clean computer keyboard and monitor",todo,"New Items",,,2025-08-19,item_107,2025-08-19T15:00:00Z,,,,
 "Update software licenses",todo,"New Items",,,2025-08-20,item_108,2025-08-20T13:00:00Z,,,,
@@ -132,7 +132,7 @@ window.ExampleData = {
 
 "Attend team standup",todo,Done,,2025-08-07,2025-08-07,item_120,2025-08-07T09:30:00Z,2025-08-07T09:45:00Z,,,,
 "Review pull requests",todo,Done,,2025-08-07,2025-08-07,item_121,2025-08-07T14:00:00Z,2025-08-07T15:30:00Z,,,,
-"URGENT: Send weekly report",todo,"To Do",,2025-08-09,2025-08-08,item_122,2025-08-08T17:00:00Z,,,,"true"
+"Send weekly report",todo,"To Do",,2025-08-09,2025-08-08,item_122,2025-08-08T17:00:00Z,,,,"true"
 "Database optimization",todo,"In Progress",,2025-08-11,2025-08-09,item_123,2025-08-09T10:00:00Z,,,,
 "Security audit review",todo,"To Do",,2025-08-13,2025-08-10,item_124,2025-08-10T09:00:00Z,,,,
 "Prepare presentation slides",todo,"In Progress",,2025-08-12,2025-08-11,item_125,2025-08-11T13:00:00Z,,,,

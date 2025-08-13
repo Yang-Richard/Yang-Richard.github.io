@@ -4,10 +4,12 @@ window.ChangelogContent = {
         return `
             <br>
             <div class="changelog-entries">
-                <p><strong>v6.1 - 2025-08-11</strong></p>
+                <p><strong>v6.2 - 2025-08-11</strong></p>
                 <ul>
                     <li>Windows electron app support</li>
-                    <li>Custom prompts</li>
+                    <li>Custom warning prompts</li>
+                    <li>Resizing for different screen layouts</li>
+                    <li>Edit recurring items</li>
                     <li>Bug fixes </li>
                 </ul>
                 <br>

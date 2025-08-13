@@ -115,8 +115,8 @@ App controls, statistics, and changelog.
 - **And more...**
 
 ### Date Navigation
-- **h / ←**: Previous day | **l / →**: Next day
-- **j / ↓**: Next week | **k / ↑**: Previous week
+- **←**: Previous day | **→**: Next day
+- **↓**: Next week | **↑**: Previous week
 - **t**: Jump to today
 
 ### Quick Actions

@@ -1,6 +1,6 @@
 {
   "name": "todo-app",
-  "version": "6.1.0",
+  "version": "6.2.0",
   "description": "A powerful todo app",
   "main": "main.js",
   "scripts": {
@@ -8,6 +8,8 @@
     "dev": "electron . --dev",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
+    "build:win-portable": "electron-builder --win portable",
+    "build:win-all": "electron-builder --win nsis portable zip",
     "dist": "electron-builder --publish=never"
   },
   "keywords": ["todo", "productivity", "electron"],
@@ -37,7 +39,15 @@
         {
         "target": "portable",
         "arch": ["x64"]
-      }
+        },
+        {
+        "target": "msi",
+        "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
       ],
       "icon": "build/icon.ico"
     },

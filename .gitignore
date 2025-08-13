@@ -21,6 +21,8 @@ Thumbs.db
 .done
 .claude
 
+build/
+
 CLAUDE.md
 Dockerfile
 BUGS.md

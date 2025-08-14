@@ -435,6 +435,96 @@ class DailyTodoApp {
         
         // Initialize link handling
         this.initLinkHandling();
+        
+        // Setup event delegation for todo items
+        this.setupEventDelegation();
+    }
+    
+    setupEventDelegation() {
+        // Main container for event delegation
+        const container = document.body;
+        
+        // Handle button clicks using event delegation
+        container.addEventListener('click', (e) => {
+            const item = e.target.closest('.todo-item');
+            if (!item) return;
+            
+            const target = e.target;
+            
+            // Delete button
+            if (target.classList.contains('delete-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.moveItemToTrash(item);
+                return;
+            }
+            
+            // Edit button
+            if (target.classList.contains('edit-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.editItem(item);
+                return;
+            }
+            
+            // Copy to new items button
+            if (target.classList.contains('copy-new-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.copyItemToNewItems(item);
+                return;
+            }
+            
+            // Move to next day button
+            if (target.classList.contains('move-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.moveItemToNextDay(item);
+                return;
+            }
+            
+            // Create section button
+            if (target.classList.contains('create-section-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.createSectionFromItem(item);
+                return;
+            }
+            
+            // Move to backburner button
+            if (target.classList.contains('backburner-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.moveItemToBackburner(item);
+                return;
+            }
+            
+            // Move to todo button
+            if (target.classList.contains('todo-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.moveItemToTodo(item);
+                return;
+            }
+        });
+        
+        // Note: Drag events kept as individual listeners on items since drag/drop 
+        // needs to work on various drop zones, not just todo items
+        
+        // Handle tooltip events using event delegation
+        container.addEventListener('mouseenter', (e) => {
+            const item = e.target.closest('.todo-item');
+            if (item && e.target === item) {
+                this.showTooltip(e, item);
+            }
+        }, true); // Use capture to ensure we get the event
+        
+        container.addEventListener('mouseleave', (e) => {
+            const item = e.target.closest('.todo-item');
+            if (item && e.target === item) {
+                this.hideTooltip(item);
+            }
+        }, true); // Use capture to ensure we get the event
     }
     
     setupElectronDragFix() {
@@ -2104,7 +2194,8 @@ class DailyTodoApp {
             sectionId: sectionId,
             dueDate: item.dataset.dueDate || null,
             highPriority: item.dataset.highPriority === 'true',
-            panel: 'todo'
+            panel: 'todo',
+            recurringTaskId: item.dataset.recurringTaskId || null
         };
         
         if (sectionId) {
@@ -2174,7 +2265,8 @@ class DailyTodoApp {
             sectionId: sectionId,
             dueDate: item.dataset.dueDate || null,
             highPriority: item.dataset.highPriority === 'true',
-            panel: 'backburner'
+            panel: 'backburner',
+            recurringTaskId: item.dataset.recurringTaskId || null
         };
         
         if (sectionId) {
@@ -2382,17 +2474,13 @@ class DailyTodoApp {
     // Priority-based sorting function for todo items
     sortItemsByPriority(items) {
         return items.sort((a, b) => {
-            // Get priority from the todo data
-            const aPriority = this.getTodoPriorityValue(a);
-            const bPriority = this.getTodoPriorityValue(b);
-            
-            // Sort by priority: lower number = higher priority (urgent=1, high=2, medium=3, normal=4)
-            if (aPriority !== bPriority) {
-                return aPriority - bPriority;
+            // Use the same logic as shouldInsertBefore but inverted for sort
+            if (this.shouldInsertBefore(a, b)) {
+                return -1; // a should come before b
+            } else if (this.shouldInsertBefore(b, a)) {
+                return 1;  // b should come before a
             }
-            
-            // If same priority, sort by creation date (newest first)
-            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+            return 0; // they are equal
         });
     }
     
@@ -2430,25 +2518,15 @@ class DailyTodoApp {
     // Insert item in priority order
     insertItemByPriority(container, newItem, todoData) {
         const existingItems = Array.from(container.children);
-        const newPriority = this.getTodoPriorityValue(todoData);
         
-        // Find the insertion point
+        // Find the insertion point using comprehensive comparison
         let insertIndex = existingItems.length;
         for (let i = 0; i < existingItems.length; i++) {
             const existingTodo = this.getTodoDataFromItem(existingItems[i]);
-            const existingPriority = this.getTodoPriorityValue(existingTodo);
             
-            if (newPriority < existingPriority) {
+            if (this.shouldInsertBefore(todoData, existingTodo)) {
                 insertIndex = i;
                 break;
-            } else if (newPriority === existingPriority) {
-                // Same priority, sort by creation date (newer first)
-                const newDate = new Date(todoData.createdAt || 0);
-                const existingDate = new Date(existingTodo.createdAt || 0);
-                if (newDate > existingDate) {
-                    insertIndex = i;
-                    break;
-                }
             }
         }
         
@@ -2459,12 +2537,98 @@ class DailyTodoApp {
         }
     }
     
+    // Determine if new item should be inserted before existing item
+    shouldInsertBefore(newTodo, existingTodo) {
+        // 1. Urgent items (high priority) always go first
+        if (newTodo.highPriority && !existingTodo.highPriority) {
+            return true;
+        }
+        if (!newTodo.highPriority && existingTodo.highPriority) {
+            return false;
+        }
+        
+        // 2. If both are urgent or both are normal, sort by due date
+        const newDueDate = newTodo.dueDate ? new Date(newTodo.dueDate) : null;
+        const existingDueDate = existingTodo.dueDate ? new Date(existingTodo.dueDate) : null;
+        
+        // Items with due dates come before items without due dates
+        if (newDueDate && !existingDueDate) {
+            return true;
+        }
+        if (!newDueDate && existingDueDate) {
+            return false;
+        }
+        
+        // If both have due dates, earlier date comes first
+        if (newDueDate && existingDueDate) {
+            if (newDueDate.getTime() !== existingDueDate.getTime()) {
+                return newDueDate.getTime() < existingDueDate.getTime();
+            }
+        }
+        
+        // 3. If same priority and same due date (or both no due date), sort alphabetically
+        const newText = newTodo.text || '';
+        const existingText = existingTodo.text || '';
+        
+        return newText.toLowerCase() < existingText.toLowerCase();
+    }
+    
+    // Re-sort all items in a container
+    resortContainer(container) {
+        if (!container || !container.children || container.children.length <= 1) {
+            return; // Nothing to sort
+        }
+        
+        const items = Array.from(container.children);
+        const itemsData = items.map(item => ({
+            element: item,
+            data: this.getTodoDataFromItem(item)
+        }));
+        
+        // Sort using our comparison logic
+        itemsData.sort((a, b) => {
+            if (this.shouldInsertBefore(a.data, b.data)) {
+                return -1;
+            } else if (this.shouldInsertBefore(b.data, a.data)) {
+                return 1;
+            }
+            return 0;
+        });
+        
+        // Remove all items first
+        items.forEach(item => item.remove());
+        
+        // Re-add them in sorted order
+        itemsData.forEach(itemData => {
+            container.appendChild(itemData.element);
+        });
+    }
+    
+    // Sort all item containers on the current view
+    sortAllContainers() {
+        // Sort main columns
+        if (this.todoItems) this.resortContainer(this.todoItems);
+        if (this.inProgressItems) this.resortContainer(this.inProgressItems);
+        if (this.doneItems) this.resortContainer(this.doneItems);
+        if (this.unsortedItems) this.resortContainer(this.unsortedItems);
+        
+        // Sort section columns
+        const sectionContainers = document.querySelectorAll('.section-todo .items, .section-in-progress .items, .section-done .items');
+        sectionContainers.forEach(container => {
+            this.resortContainer(container);
+        });
+        
+        // Sort backburner containers if visible
+        if (this.backburnerUnsortedItems) this.resortContainer(this.backburnerUnsortedItems);
+    }
+    
     // Extract todo data from DOM item (for priority comparison)
     getTodoDataFromItem(itemElement) {
         return {
             highPriority: itemElement.classList.contains('high-priority') || itemElement.dataset.highPriority === 'true',
             dueDate: itemElement.dataset.dueDate,
-            createdAt: itemElement.dataset.createdAt
+            createdAt: itemElement.dataset.createdAt,
+            text: this.getItemText(itemElement)
         };
     }
     
@@ -2555,6 +2719,9 @@ class DailyTodoApp {
         // Update due date styling for all loaded items
         this.updateAllItemsDueDateStyling();
         this.updateAllItemCounts();
+        
+        // Ensure all containers are properly sorted
+        this.sortAllContainers();
         
         // Load daily notes for this date
         this.loadDailyNotes();
@@ -3115,49 +3282,8 @@ class DailyTodoApp {
             <div class="tooltip" id="${uniqueTooltipId}"></div>
         `;
         
-        item.querySelector('.delete-btn').addEventListener('click', () => {
-            this.moveItemToTrash(item);
-        });
-        
-        item.querySelector('.edit-btn').addEventListener('click', () => {
-            this.editItem(item);
-        });
-        
-        
-        item.querySelector('.copy-new-btn').addEventListener('click', () => {
-            this.copyItemToNewItems(item);
-        });
-        
-        // Only add move button listener if the button exists (todo panel only)
-        const moveBtn = item.querySelector('.move-btn');
-        if (moveBtn) {
-            moveBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.moveItemToNextDay(item);
-            });
-        }
-        
-        item.querySelector('.create-section-btn').addEventListener('click', () => {
-            this.createSectionFromItem(item);
-        });
-        
-        // Add panel-specific button listeners
-        const backburnerBtn = item.querySelector('.backburner-btn');
-        const todoBtn = item.querySelector('.todo-btn');
-        
-        if (backburnerBtn) {
-            backburnerBtn.addEventListener('click', () => {
-                this.moveItemToBackburner(item);
-            });
-        }
-        
-        if (todoBtn) {
-            todoBtn.addEventListener('click', () => {
-                this.moveItemToTodo(item);
-            });
-        }
-        
+        // Button event listeners handled by event delegation - see setupEventDelegation()
+        // Drag events handled individually since they need to work on various drop zones
         item.addEventListener('dragstart', this.handleDragStart.bind(this));
         item.addEventListener('dragend', this.handleDragEnd.bind(this));
         item.addEventListener('dragover', this.handleDragOver.bind(this));
@@ -3173,16 +3299,17 @@ class DailyTodoApp {
             }, 100);
         });
         
-        // Add hover functionality for tooltip
-        item.addEventListener('mouseenter', (e) => this.showTooltip(e, item));
-        item.addEventListener('mouseleave', () => this.hideTooltip(item));
-        
         
         // Apply due date styling
         this.applyDueDateStyling(item);
         
         return item;
     }
+    
+    // Memory optimization: Hybrid approach for 10,000+ items
+    // Button events: Event delegation (1 listener vs 6 per item)
+    // Drag events: Individual listeners (4 per item, needed for drop zones)
+    // Reduces memory usage from 10+ listeners per item to 4 per item
     
     applyDueDateStyling(item) {
         const dueDate = item.dataset.dueDate;
@@ -3360,13 +3487,27 @@ class DailyTodoApp {
         if (sourcePanel === 'backburner') {
             // Copy to backburner misc items
             const newItem = this.createTodoItem(text, null, null, null, null, null, 'backburner', false, recurringTaskId);
-            this.backburnerUnsortedItems.appendChild(newItem);
+            const todoData = {
+                urgent: false,
+                highPriority: false,
+                dueDate: null,
+                createdAt: new Date().toISOString(),
+                text: text
+            };
+            this.insertItemByPriority(this.backburnerUnsortedItems, newItem, todoData);
             this.saveBackburnerItems();
             this.showFeedback('Copied to Misc Items');
         } else {
             // Copy to TODO new items
             const newItem = this.createTodoItem(text, null, null, null, null, null, 'todo', false, recurringTaskId);
-            this.unsortedItems.appendChild(newItem);
+            const todoData = {
+                urgent: false,
+                highPriority: false,
+                dueDate: null,
+                createdAt: new Date().toISOString(),
+                text: text
+            };
+            this.insertItemByPriority(this.unsortedItems, newItem, todoData);
             this.saveGlobalUnsortedItems();
             this.showFeedback('Copied to New Items');
         }
@@ -4207,7 +4348,7 @@ class DailyTodoApp {
                 item.text,
                 null, // id - will be generated
                 item.created_at,
-                item.section_name || null, // sectionId
+                item.section_id || null, // sectionId
                 item.item_id,
                 item.due_date || null,
                 item.panel,
@@ -4760,6 +4901,9 @@ class DailyTodoApp {
                 // Re-apply due date styling after update
                 this.applyDueDateStyling(item);
                 
+                // Re-sort the container to maintain proper order
+                this.resortContainer(item.parentElement);
+                
                 this.saveTodosForDate();
                 this.updateCalendarColors();
                 this.showFeedback('Task updated');
@@ -4767,6 +4911,9 @@ class DailyTodoApp {
             editContainer.remove();
             textElement.style.display = 'block';
             item.draggable = true; // Re-enable dragging
+            
+            // Hide any persistent tooltips
+            this.hideTooltip(item);
             
             // Restore action buttons
             if (actionButtons) {
@@ -4778,6 +4925,9 @@ class DailyTodoApp {
             editContainer.remove();
             textElement.style.display = 'block';
             item.draggable = true; // Re-enable dragging
+            
+            // Hide any persistent tooltips
+            this.hideTooltip(item);
             
             // Restore action buttons
             if (actionButtons) {
@@ -5964,6 +6114,7 @@ class DailyTodoApp {
         const createdAt = item.dataset.createdAt;
         const itemId = item.dataset.itemId;
         const sectionId = item.dataset.sectionId;
+        const sectionName = sectionId ? this.getSectionName(sectionId) : null;
         const dueDate = item.dataset.dueDate;
         const isHighPriority = item.dataset.highPriority === 'true';
         const recurringTaskId = item.dataset.recurringTaskId;
@@ -5979,6 +6130,7 @@ class DailyTodoApp {
             text: text,
             createdAt: createdAt,
             sectionId: sectionId || null,
+            sectionName: sectionName || null,
             dueDate: dueDate || null,
             highPriority: isHighPriority,
             recurringTaskId: recurringTaskId || null,
@@ -6023,6 +6175,7 @@ class DailyTodoApp {
         const text = this.getItemText(trashItem);
         const itemId = trashItem.dataset.itemId;
         const sectionId = trashItem.dataset.sectionId;
+        const sectionName = trashItem.dataset.sectionName;
         const createdAt = trashItem.dataset.createdAt;
         const dueDate = trashItem.dataset.dueDate;
         const isHighPriority = trashItem.dataset.highPriority === 'true';
@@ -6070,7 +6223,7 @@ class DailyTodoApp {
                     // Create section if it doesn't exist
                     backburnerData.sections[sectionId] = {
                         id: sectionId,
-                        name: 'Restored Section',
+                        name: sectionName || 'Restored Section',
                         todo: [],
                         inProgress: [],
                         done: []
@@ -6140,10 +6293,9 @@ class DailyTodoApp {
             if (sectionId) {
                 // Create section if it doesn't exist
                 if (!todos.sections[sectionId]) {
-                    const sectionName = this.getSectionName(sectionId) || 'Restored Section';
                     todos.sections[sectionId] = {
                         id: sectionId,
-                        name: sectionName,
+                        name: sectionName || this.getSectionName(sectionId) || 'Restored Section',
                         todo: [],
                         inProgress: [],
                         done: []
@@ -6221,8 +6373,8 @@ class DailyTodoApp {
                 let section = document.getElementById(sectionId);
                 if (!section) {
                     // If section doesn't exist, create it
-                    const sectionName = this.getSectionName(sectionId) || 'Restored Section';
-                    section = this.createSection(sectionName, sectionId);
+                    const restoredSectionName = sectionName || this.getSectionName(sectionId) || 'Restored Section';
+                    section = this.createSection(restoredSectionName, sectionId);
                 }
                 
                 // Determine which section column to restore to based on original column type
@@ -6250,7 +6402,14 @@ class DailyTodoApp {
                     
                     // Create as backburner item instead
                     const backburnerItem = this.createTodoItem(text, null, createdAt, sectionId, itemId, dueDate, 'backburner', isHighPriority, recurringTaskId);
-                    this.backburnerUnsortedItems.appendChild(backburnerItem);
+                    const todoData = {
+                        urgent: false,
+                        highPriority: isHighPriority,
+                        dueDate: dueDate,
+                        createdAt: createdAt,
+                        text: text
+                    };
+                    this.insertItemByPriority(this.backburnerUnsortedItems, backburnerItem, todoData);
                     
                     // Save to backburner storage
                     this.saveBackburnerItems();
@@ -7182,7 +7341,8 @@ class DailyTodoApp {
                 dueDate: item.dataset.dueDate || null,
                 isHighPriority: item.dataset.highPriority === 'true',
                 createdAt: item.dataset.createdAt || new Date().toISOString(),
-                itemId: item.dataset.itemId
+                itemId: item.dataset.itemId,
+                recurringTaskId: item.dataset.recurringTaskId || null
             });
         });
         
@@ -7193,14 +7353,13 @@ class DailyTodoApp {
                 dueDate: item.dataset.dueDate || null,
                 isHighPriority: item.dataset.highPriority === 'true',
                 createdAt: item.dataset.createdAt || new Date().toISOString(),
-                itemId: item.dataset.itemId
+                itemId: item.dataset.itemId,
+                recurringTaskId: item.dataset.recurringTaskId || null
             });
         });
         
-        // Only create section on next day if there are todo/in-progress items to move
-        if (sectionData.todo.length > 0 || sectionData.inProgress.length > 0) {
-            this.addSectionToDate(sectionData, nextDate);
-        }
+        // Always create section on next day (even if empty)
+        this.addSectionToDate(sectionData, nextDate);
         
         // Remove moved items from current section
         Array.from(todoItems).forEach(item => item.remove());
@@ -7218,7 +7377,10 @@ class DailyTodoApp {
         this.updateCalendarColors();
         
         const itemCount = sectionData.todo.length + sectionData.inProgress.length;
-        if (hasDoneItems) {
+        if (itemCount === 0 && !hasDoneItems) {
+            // Empty section being moved
+            this.showFeedback(`Moved empty section "${sectionName}" to ${this.formatDateShort(nextDate)}`);
+        } else if (hasDoneItems) {
             this.showFeedback(`Moved ${itemCount} items from section "${sectionName}" to ${this.formatDateShort(nextDate)} (done items stayed)`);
         } else {
             this.showFeedback(`Moved section "${sectionName}" to ${this.formatDateShort(nextDate)}`);
@@ -7326,7 +7488,9 @@ class DailyTodoApp {
                 const dueDate = item.dataset.dueDate || null;
                 const createdAt = item.dataset.createdAt || new Date().toISOString();
                 const itemId = item.dataset.itemId;
-                this.addItemToDate(text, 'todo', nextDate, null, dueDate, createdAt, itemId);
+                const isHighPriority = item.dataset.highPriority === 'true';
+                const recurringTaskId = item.dataset.recurringTaskId || null;
+                this.addItemToDate(text, 'todo', nextDate, null, dueDate, createdAt, itemId, null, isHighPriority, 'todo', recurringTaskId);
                 item.remove();
             });
             
@@ -7335,7 +7499,9 @@ class DailyTodoApp {
                 const dueDate = item.dataset.dueDate || null;
                 const createdAt = item.dataset.createdAt || new Date().toISOString();
                 const itemId = item.dataset.itemId;
-                this.addItemToDate(text, 'inProgress', nextDate, null, dueDate, createdAt, itemId);
+                const isHighPriority = item.dataset.highPriority === 'true';
+                const recurringTaskId = item.dataset.recurringTaskId || null;
+                this.addItemToDate(text, 'inProgress', nextDate, null, dueDate, createdAt, itemId, null, isHighPriority, 'todo', recurringTaskId);
                 item.remove();
             });
             
@@ -7365,7 +7531,8 @@ class DailyTodoApp {
                         dueDate: item.dataset.dueDate || null,
                         isHighPriority: item.dataset.highPriority === 'true',
                         createdAt: item.dataset.createdAt || new Date().toISOString(),
-                        itemId: item.dataset.itemId
+                        itemId: item.dataset.itemId,
+                recurringTaskId: item.dataset.recurringTaskId || null
                     });
                 });
                 
@@ -7376,14 +7543,13 @@ class DailyTodoApp {
                         dueDate: item.dataset.dueDate || null,
                         isHighPriority: item.dataset.highPriority === 'true',
                         createdAt: item.dataset.createdAt || new Date().toISOString(),
-                        itemId: item.dataset.itemId
+                        itemId: item.dataset.itemId,
+                recurringTaskId: item.dataset.recurringTaskId || null
                     });
                 });
                 
-                // Only create section on next day if there are todo/in-progress items to move
-                if (sectionData.todo.length > 0 || sectionData.inProgress.length > 0) {
-                    this.addSectionToDate(sectionData, nextDate);
-                }
+                // Always create section on next day (even if empty)
+                this.addSectionToDate(sectionData, nextDate);
                 
                 // Remove moved items from current section
                 Array.from(sectionTodoItems).forEach(item => item.remove());
@@ -7461,7 +7627,8 @@ class DailyTodoApp {
                 dueDate: item.dataset.dueDate || null,
                 isHighPriority: item.dataset.highPriority === 'true',
                 createdAt: item.dataset.createdAt || new Date().toISOString(),
-                itemId: item.dataset.itemId
+                itemId: item.dataset.itemId,
+                recurringTaskId: item.dataset.recurringTaskId || null
             });
         });
         
@@ -7472,14 +7639,13 @@ class DailyTodoApp {
                 dueDate: item.dataset.dueDate || null,
                 isHighPriority: item.dataset.highPriority === 'true',
                 createdAt: item.dataset.createdAt || new Date().toISOString(),
-                itemId: item.dataset.itemId
+                itemId: item.dataset.itemId,
+                recurringTaskId: item.dataset.recurringTaskId || null
             });
         });
         
-        // Only create section on target date if there are todo/in-progress items to move
-        if (sectionData.todo.length > 0 || sectionData.inProgress.length > 0) {
-            this.addSectionToDate(sectionData, targetDate);
-        }
+        // Always create section on target date (even if empty)
+        this.addSectionToDate(sectionData, targetDate);
         
         // Remove moved items from current section
         Array.from(todoItems).forEach(item => item.remove());
@@ -7497,7 +7663,10 @@ class DailyTodoApp {
         this.updateCalendarColors();
         
         const itemCount = sectionData.todo.length + sectionData.inProgress.length;
-        if (hasDoneItems) {
+        if (itemCount === 0 && !hasDoneItems) {
+            // Empty section being moved
+            this.showFeedback(`Moved empty section "${sectionName}" to ${dateStr}`);
+        } else if (hasDoneItems) {
             this.showFeedback(`Moved ${itemCount} items from section "${sectionName}" to ${dateStr} (done items stayed)`);
         } else {
             this.showFeedback(`Moved section "${sectionName}" to ${dateStr}`);
@@ -7549,35 +7718,47 @@ class DailyTodoApp {
         
         // Add todo items
         sectionData.todo.forEach(item => {
-            targetSection.todo.push({
+            const newItem = {
                 id: `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                itemId: this.getNextItemId(),
+                itemId: item.itemId || this.getNextItemId(),
                 text: item.text,
                 createdAt: item.createdAt,
                 sectionId: targetSectionId
-            });
+            };
+            if (item.dueDate) newItem.dueDate = item.dueDate;
+            if (item.isHighPriority) newItem.highPriority = item.isHighPriority;
+            if (item.recurringTaskId) newItem.recurringTaskId = item.recurringTaskId;
+            targetSection.todo.push(newItem);
         });
         
         // Add in progress items
         sectionData.inProgress.forEach(item => {
-            targetSection.inProgress.push({
+            const newItem = {
                 id: `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                itemId: this.getNextItemId(),
+                itemId: item.itemId || this.getNextItemId(),
                 text: item.text,
                 createdAt: item.createdAt,
                 sectionId: targetSectionId
-            });
+            };
+            if (item.dueDate) newItem.dueDate = item.dueDate;
+            if (item.isHighPriority) newItem.highPriority = item.isHighPriority;
+            if (item.recurringTaskId) newItem.recurringTaskId = item.recurringTaskId;
+            targetSection.inProgress.push(newItem);
         });
         
         // Add done items
         sectionData.done.forEach(item => {
-            targetSection.done.push({
+            const newItem = {
                 id: `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                itemId: this.getNextItemId(),
+                itemId: item.itemId || this.getNextItemId(),
                 text: item.text,
                 createdAt: item.createdAt,
                 sectionId: targetSectionId
-            });
+            };
+            if (item.dueDate) newItem.dueDate = item.dueDate;
+            if (item.isHighPriority) newItem.highPriority = item.isHighPriority;
+            if (item.recurringTaskId) newItem.recurringTaskId = item.recurringTaskId;
+            targetSection.done.push(newItem);
         });
         
         localStorage.setItem(`dailyTodos_${dateKey}`, JSON.stringify(todos));
@@ -7905,9 +8086,6 @@ class DailyTodoApp {
         
         this.captureStateForUndo('move', `Move "${text}" to backburner`);
         
-        // Create new backburner item
-        const backburnerItem = this.createTodoItem(text, null, createdAt, sectionId, itemId, dueDate, 'backburner', isHighPriority, recurringTaskId);
-        
         if (sectionId) {
             // Move to existing section with same name or create new section (following moveItemToTodo pattern)
             const originalSection = document.querySelector(`[data-section-id="${sectionId}"]`);
@@ -7936,6 +8114,9 @@ class DailyTodoApp {
                     targetSectionId = `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 }
                 
+                // Create new backburner item with the TARGET section ID, not the original
+                const backburnerItem = this.createTodoItem(text, null, createdAt, targetSectionId, itemId, dueDate, 'backburner', isHighPriority, recurringTaskId);
+                
                 // Determine which column the item was in
                 const columnType = this.getColumnType(item);
                 let targetColumnType = 'todo';
@@ -7958,6 +8139,9 @@ class DailyTodoApp {
                 }
             }
         } else {
+            // Create new backburner item without section ID
+            const backburnerItem = this.createTodoItem(text, null, createdAt, null, itemId, dueDate, 'backburner', isHighPriority, recurringTaskId);
+            
             // Move to misc items (add to backburner storage directly)
             this.addItemToBackburnerStorage(backburnerItem, 'unsorted');
         }
@@ -7985,9 +8169,6 @@ class DailyTodoApp {
         const recurringTaskId = item.dataset.recurringTaskId;
         
         this.captureStateForUndo('move', `Move "${text}" to TODO`);
-        
-        // Create new todo item
-        const todoItem = this.createTodoItem(text, null, createdAt, sectionId, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
         
         if (sectionId) {
             // Move to section under present day (today)
@@ -8020,6 +8201,9 @@ class DailyTodoApp {
                     targetSectionId = `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 }
                 
+                // Create new todo item with the TARGET section ID, not the original
+                const todoItem = this.createTodoItem(text, null, createdAt, targetSectionId, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
+                
                 // Always place in todo column when moving from backburner
                 this.addItemToDateStorage(todayKey, todoItem, 'todo', targetSectionId);
                 
@@ -8033,6 +8217,9 @@ class DailyTodoApp {
                 }
             }
         } else {
+            // Create new todo item without section ID
+            const todoItem = this.createTodoItem(text, null, createdAt, null, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
+            
             // Move to To Do column under present day (today)
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -8134,20 +8321,44 @@ class DailyTodoApp {
             targetSectionId = `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         }
         
-        // Move all items from each column to today's storage
+        // Check if section has any items
+        let hasItems = false;
         ['todo', 'inProgress', 'done'].forEach(columnType => {
             const sourceColumn = sectionElement.querySelector(`.section-${columnType === 'inProgress' ? 'in-progress' : columnType} .items`);
-            
-            Array.from(sourceColumn.children).forEach(item => {
-                this.addItemToDateStorage(todayKey, item, columnType, targetSectionId);
-            });
+            if (sourceColumn.children.length > 0) {
+                hasItems = true;
+            }
         });
         
-        // Update section name in today's storage
-        const updatedData = JSON.parse(localStorage.getItem(`dailyTodos_${todayKey}`));
-        if (updatedData.sections[targetSectionId]) {
-            updatedData.sections[targetSectionId].name = sectionName;
-            localStorage.setItem(`dailyTodos_${todayKey}`, JSON.stringify(updatedData));
+        // If section is empty, create it in today's storage
+        if (!hasItems) {
+            if (!todos.sections[targetSectionId]) {
+                todos.sections[targetSectionId] = {
+                    id: targetSectionId,
+                    name: sectionName,
+                    panel: 'todo',
+                    todo: [],
+                    inProgress: [],
+                    done: []
+                };
+            }
+            localStorage.setItem(`dailyTodos_${todayKey}`, JSON.stringify(todos));
+        } else {
+            // Move all items from each column to today's storage
+            ['todo', 'inProgress', 'done'].forEach(columnType => {
+                const sourceColumn = sectionElement.querySelector(`.section-${columnType === 'inProgress' ? 'in-progress' : columnType} .items`);
+                
+                Array.from(sourceColumn.children).forEach(item => {
+                    this.addItemToDateStorage(todayKey, item, columnType, targetSectionId);
+                });
+            });
+            
+            // Update section name in today's storage
+            const updatedData = JSON.parse(localStorage.getItem(`dailyTodos_${todayKey}`));
+            if (updatedData.sections[targetSectionId]) {
+                updatedData.sections[targetSectionId].name = sectionName;
+                localStorage.setItem(`dailyTodos_${todayKey}`, JSON.stringify(updatedData));
+            }
         }
         
         // Remove original section from DOM
@@ -10024,15 +10235,22 @@ class DailyTodoApp {
     }
     
     addToNewItems(text, dueDate, isHighPriority) {
-        const item = this.createTodoItem(text, null, null, null, null, dueDate, 'todo', isHighPriority);
-        this.unsortedItems.appendChild(item);
+        const item = this.createTodoItem(text, null, null, null, null, dueDate, 'todo', isHighPriority, null);
+        const todoData = {
+            urgent: false,
+            highPriority: isHighPriority,
+            dueDate: dueDate,
+            createdAt: new Date().toISOString(),
+            text: text
+        };
+        this.insertItemByPriority(this.unsortedItems, item, todoData);
         this.saveGlobalUnsortedItems();
         this.updateAllItemCounts();
         this.showFeedback('Added to New Items', 'success');
     }
     
     addToBackburner(text, dueDate, isHighPriority) {
-        const item = this.createTodoItem(text, null, null, null, null, dueDate, 'backburner', isHighPriority);
+        const item = this.createTodoItem(text, null, null, null, null, dueDate, 'backburner', isHighPriority, null);
         
         // Get backburner unsorted container
         const backburnerUnsorted = document.getElementById('backburnerUnsortedItems');

@@ -413,6 +413,14 @@ class DailyTodoApp {
         // Show initial panel (wiki on first visit, last selected panel on subsequent visits)
         this.showInitialPanel();
         
+        // Load todos and backburner items after panel is shown
+        this.loadTodosForDate();
+        this.loadGlobalUnsortedItems();
+        this.loadDailyNotes();
+        this.loadBackburnerItems();
+        this.loadRecurringTasks();
+        this.updateCalendarColors();
+        
         // Initialize keyboard shortcuts
         this.initKeyboardShortcuts();
         
@@ -1746,7 +1754,7 @@ class DailyTodoApp {
             const secretStat = easterEggStats[Math.floor(Math.random() * easterEggStats.length)];
             setTimeout(() => {
                 this.showFeedback(`📊 Secret Stat: ${secretStat}`, 'success');
-            }, 1000);
+            }, 10000);
         }
     }
     
@@ -8086,6 +8094,11 @@ class DailyTodoApp {
         
         this.captureStateForUndo('move', `Move "${text}" to backburner`);
         
+        // Remove item from todo storage FIRST before adding to backburner
+        if (item.dataset.panel === 'todo') {
+            this.removeItemFromTodoStorage(itemId, sectionId);
+        }
+        
         if (sectionId) {
             // Move to existing section with same name or create new section (following moveItemToTodo pattern)
             const originalSection = document.querySelector(`[data-section-id="${sectionId}"]`);
@@ -8115,7 +8128,8 @@ class DailyTodoApp {
                 }
                 
                 // Create new backburner item with the TARGET section ID, not the original
-                const backburnerItem = this.createTodoItem(text, null, createdAt, targetSectionId, itemId, dueDate, 'backburner', isHighPriority, recurringTaskId);
+                // IMPORTANT: Pass the item's existing ID to preserve it
+                const backburnerItem = this.createTodoItem(text, item.id, createdAt, targetSectionId, itemId, dueDate, 'backburner', isHighPriority, recurringTaskId);
                 
                 // Determine which column the item was in
                 const columnType = this.getColumnType(item);
@@ -8140,7 +8154,8 @@ class DailyTodoApp {
             }
         } else {
             // Create new backburner item without section ID
-            const backburnerItem = this.createTodoItem(text, null, createdAt, null, itemId, dueDate, 'backburner', isHighPriority, recurringTaskId);
+            // IMPORTANT: Pass the item's existing ID to preserve it
+            const backburnerItem = this.createTodoItem(text, item.id, createdAt, null, itemId, dueDate, 'backburner', isHighPriority, recurringTaskId);
             
             // Move to misc items (add to backburner storage directly)
             this.addItemToBackburnerStorage(backburnerItem, 'unsorted');
@@ -8169,6 +8184,11 @@ class DailyTodoApp {
         const recurringTaskId = item.dataset.recurringTaskId;
         
         this.captureStateForUndo('move', `Move "${text}" to TODO`);
+        
+        // Remove item from backburner storage FIRST before adding to todo
+        if (item.dataset.panel === 'backburner') {
+            this.removeItemFromBackburnerStorage(itemId, sectionId);
+        }
         
         if (sectionId) {
             // Move to section under present day (today)
@@ -8201,8 +8221,9 @@ class DailyTodoApp {
                     targetSectionId = `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 }
                 
-                // Create new todo item with the TARGET section ID, not the original
-                const todoItem = this.createTodoItem(text, null, createdAt, targetSectionId, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
+                // Create new todo item with the TARGET section ID, not the original  
+                // IMPORTANT: Pass the item's existing ID to preserve it
+                const todoItem = this.createTodoItem(text, item.id, createdAt, targetSectionId, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
                 
                 // Always place in todo column when moving from backburner
                 this.addItemToDateStorage(todayKey, todoItem, 'todo', targetSectionId);
@@ -8218,7 +8239,8 @@ class DailyTodoApp {
             }
         } else {
             // Create new todo item without section ID
-            const todoItem = this.createTodoItem(text, null, createdAt, null, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
+            // IMPORTANT: Pass the item's existing ID to preserve it
+            const todoItem = this.createTodoItem(text, item.id, createdAt, null, itemId, dueDate, 'todo', isHighPriority, recurringTaskId);
             
             // Move to To Do column under present day (today)
             const today = new Date();
@@ -8450,6 +8472,77 @@ class DailyTodoApp {
         this.updateAllItemCounts();
         
         this.showFeedback(`Deleted section "${sectionName}" and moved items to main columns`);
+    }
+    
+    removeItemFromBackburnerStorage(itemId, sectionId = null) {
+        const existingData = localStorage.getItem('backburnerItems');
+        if (!existingData) return;
+        
+        let backburnerData = JSON.parse(existingData);
+        if (!backburnerData.sections) backburnerData.sections = {};
+        if (!backburnerData.unsortedItems) backburnerData.unsortedItems = [];
+        
+        // Remove from unsorted items
+        backburnerData.unsortedItems = backburnerData.unsortedItems.filter(item => item.itemId !== itemId);
+        
+        // Remove from sections
+        if (sectionId && backburnerData.sections[sectionId]) {
+            const section = backburnerData.sections[sectionId];
+            ['todo', 'inProgress', 'done'].forEach(column => {
+                if (section[column]) {
+                    section[column] = section[column].filter(item => item.itemId !== itemId);
+                }
+            });
+        }
+        
+        // Check all sections to be safe (in case item is duplicated in wrong sections)
+        Object.values(backburnerData.sections).forEach(section => {
+            ['todo', 'inProgress', 'done'].forEach(column => {
+                if (section[column]) {
+                    section[column] = section[column].filter(item => item.itemId !== itemId);
+                }
+            });
+        });
+        
+        localStorage.setItem('backburnerItems', JSON.stringify(backburnerData));
+    }
+    
+    removeItemFromTodoStorage(itemId, sectionId = null) {
+        const dateKey = this.getDateKey();
+        const existingData = localStorage.getItem(`dailyTodos_${dateKey}`);
+        if (!existingData) return;
+        
+        let todos = JSON.parse(existingData);
+        
+        // Remove from main columns
+        ['todo', 'inProgress', 'done'].forEach(column => {
+            if (todos[column]) {
+                todos[column] = todos[column].filter(item => item.itemId !== itemId);
+            }
+        });
+        
+        // Remove from sections
+        if (sectionId && todos.sections && todos.sections[sectionId]) {
+            const section = todos.sections[sectionId];
+            ['todo', 'inProgress', 'done'].forEach(column => {
+                if (section[column]) {
+                    section[column] = section[column].filter(item => item.itemId !== itemId);
+                }
+            });
+        }
+        
+        // Check all sections to be safe (in case item is duplicated in wrong sections)
+        if (todos.sections) {
+            Object.values(todos.sections).forEach(section => {
+                ['todo', 'inProgress', 'done'].forEach(column => {
+                    if (section[column]) {
+                        section[column] = section[column].filter(item => item.itemId !== itemId);
+                    }
+                });
+            });
+        }
+        
+        localStorage.setItem(`dailyTodos_${dateKey}`, JSON.stringify(todos));
     }
     
     checkAndCleanupEmptyBackburnerSection(originalSectionId) {

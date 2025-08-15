@@ -4,7 +4,7 @@
 const appConfig = {
     // App information
     name: 'Todo Board',
-    version: '6.3',
+    version: '6.5',
     description: 'A powerful task management application with Kanban boards, calendar integration, and Pomodoro timer.',
     author: 'Richard',
     license: 'MIT',
@@ -21,8 +21,15 @@ const appConfig = {
     // Full changelog
     changelog: [
         {
-            version: '6.3',
-            date: '2025-08-13',
+            version: '6.5',
+            date: '2025-08-15',
+            changes: [
+                'Bug fixes'
+            ]
+        },
+        {
+            version: '6.4',
+            date: '2025-08-14',
             changes: [
                 'Added frameless window with custom draggable region, fixed windows state persistance',
                 'Windows application specific keyboard shortcuts',

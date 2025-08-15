@@ -408,7 +408,7 @@ function registerGlobalShortcuts() {
     });
     
     // Quick minimize
-    globalShortcut.register('CmdOrCtrl+M', () => {
+    globalShortcut.register('CmdOrCtrl+Q', () => {
         mainWindow.minimize();
     });
     

@@ -261,7 +261,7 @@ app.on('web-contents-created', (event, contents) => {
 ipcMain.handle('select-save-file', async () => {
     const result = await dialog.showSaveDialog(mainWindow, {
         title: 'Select Autosave File',
-        defaultPath: `todo-autosave-${new Date().toISOString().split('T')[0]}.json`,
+        defaultPath: `todo-autosave-${new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-')}.json`,
         filters: [
             { name: 'JSON Files', extensions: ['json'] },
             { name: 'All Files', extensions: ['*'] }

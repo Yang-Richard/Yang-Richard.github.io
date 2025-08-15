@@ -1,6 +1,6 @@
 {
   "name": "todo-app",
-  "version": "6.5.0",
+  "version": "6.6.1",
   "description": "A powerful todo app",
   "main": "main.js",
   "scripts": {

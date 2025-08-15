@@ -686,20 +686,24 @@ window.ExampleData = {
                 // Logical completion time for done items
                 let completedAt = '';
                 if (column === 'Done') {
-                    const completed = new Date(createdAt);
-                    // Complete within 1-24 hours of creation, but not before creation
-                    const hoursToComplete = Math.floor(Math.random() * 24) + 1;
-                    completed.setTime(completed.getTime() + hoursToComplete * 60 * 60 * 1000);
-                    
-                    // Don't complete items in the future
-                    if (completed <= today) {
-                        completedAt = this.formatDateTime(completed);
-                    } else if (currentDate <= today) {
-                        // Complete it sometime today if it's from today or past
-                        const todayCompletion = new Date(today);
-                        todayCompletion.setHours(Math.floor(Math.random() * 12) + 8); // 8 AM to 8 PM today
-                        completedAt = this.formatDateTime(todayCompletion);
+                    // Only set completion time if the item was created in the past or today
+                    if (currentDate <= today) {
+                        const completed = new Date(createdAt);
+                        // Complete within 1-24 hours of creation, but not before creation
+                        const hoursToComplete = Math.floor(Math.random() * 24) + 1;
+                        completed.setTime(completed.getTime() + hoursToComplete * 60 * 60 * 1000);
+                        
+                        // Don't complete items in the future
+                        if (completed <= today) {
+                            completedAt = this.formatDateTime(completed);
+                        } else {
+                            // Complete it sometime today if completion would be in future
+                            const todayCompletion = new Date(today);
+                            todayCompletion.setHours(Math.floor(Math.random() * 12) + 8); // 8 AM to 8 PM today
+                            completedAt = this.formatDateTime(todayCompletion);
+                        }
                     }
+                    // Future items marked as 'Done' should not have completion dates
                 }
 
                 items.push({
@@ -709,7 +713,7 @@ window.ExampleData = {
                     section_name: category,
                     due_date: dueDate,
                     date: this.formatDate(currentDate),
-                    item_id: `item_${String(itemId).padStart(3, '0')}`,
+                    item_id: `item-${Date.now() + itemId}-${Math.random().toString(36).substr(2, 9)}`,
                     created_at: this.formatDateTime(createdAt),
                     completed_at: completedAt,
                     deleted_at: '',
@@ -745,7 +749,7 @@ window.ExampleData = {
                 section_name: '',
                 due_date: '',
                 date: this.formatDate(createdDate),
-                item_id: `item_${String(itemId).padStart(3, '0')}`,
+                item_id: `item-${Date.now() + itemId}-${Math.random().toString(36).substr(2, 9)}`,
                 created_at: this.formatDateTime(createdAt),
                 completed_at: '',
                 deleted_at: '',
@@ -805,7 +809,7 @@ window.ExampleData = {
                 section_name: column === 'Misc Items' ? '' : category,
                 due_date: '',
                 date: '',
-                item_id: `item_${String(itemId).padStart(3, '0')}`,
+                item_id: `item-${Date.now() + itemId}-${Math.random().toString(36).substr(2, 9)}`,
                 created_at: this.formatDateTime(createdAt),
                 completed_at: completedAt,
                 deleted_at: '',
@@ -854,7 +858,7 @@ window.ExampleData = {
                 section_name: category,
                 due_date: '',
                 date: '',
-                item_id: `item_${String(itemId).padStart(3, '0')}`,
+                item_id: `item-${Date.now() + itemId}-${Math.random().toString(36).substr(2, 9)}`,
                 created_at: this.formatDateTime(createdAt),
                 completed_at: completedAt,
                 deleted_at: this.formatDateTime(deletedAt),

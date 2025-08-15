@@ -146,11 +146,18 @@ class DailyTodoApp {
         this.canvasHistory = [];
         this.historyStep = -1;
         
+        // Timer tracking for cleanup
+        this.trashReorganizeInterval = null;
+        this.autosaveInterval = null;
+        this.pomodoroInterval = null;
+        this.autoScrollInterval = null;
+        this.debugExportTimeout = null;
+        
         // Flag to prevent duplicate event listener setup
+        this.beforeUnloadListenerAdded = false;
         this.settingsEventListenersAdded = false;
         
         // Pomodoro timer state
-        this.pomodoroInterval = null;
         this.pomodoroTimeRemaining = 25 * 60; // 25 minutes in seconds
         this.pomodoroCurrentSession = 1;
         this.pomodoroTotalSessions = 4;
@@ -393,7 +400,7 @@ class DailyTodoApp {
         this.loadPanelVisibilitySettings();
         
         // Set up periodic trash reorganization (every 5 minutes)
-        setInterval(() => {
+        this.trashReorganizeInterval = setInterval(() => {
             if (!this.trashPanel.classList.contains('hidden')) {
                 this.organizeTrashByTime();
             }
@@ -729,9 +736,10 @@ class DailyTodoApp {
             this.originalPlaceholder = this.todoInput.placeholder;
         }
         
-        // Occasionally change the todo input placeholder
-        setInterval(() => { // 10% chance
-            if (Math.random() < 0.1 && this.todoInput && !this.todoInput.value && !this.placeholderInProgress) {
+        // Occasionally change the todo input placeholder (only when user focuses input)
+        let placeholderChangeTimeout;
+        const changePlaceholder = () => {
+            if (this.todoInput && !this.todoInput.value && !this.placeholderInProgress && Math.random() < 0.1) {
                 this.placeholderInProgress = true;
                 let secretPlaceholder;
                 
@@ -751,9 +759,20 @@ class DailyTodoApp {
                         this.todoInput.placeholder = "Enter item and press ENTER";
                     }
                     this.placeholderInProgress = false;
-                }, 10000);
+                }, 3000);
             }
-        }, 60000);
+        };
+        
+        // Only check for placeholder changes when user interacts with input
+        if (this.todoInput) {
+            this.todoInput.addEventListener('focus', () => {
+                clearTimeout(placeholderChangeTimeout);
+                placeholderChangeTimeout = setTimeout(changePlaceholder, Math.random() * 10000 + 5000);
+            });
+            this.todoInput.addEventListener('blur', () => {
+                clearTimeout(placeholderChangeTimeout);
+            });
+        }
     }
     
     initKeyboardShortcuts() {
@@ -1521,14 +1540,14 @@ class DailyTodoApp {
             // Get new items (global unsorted)
             const newItemsData = localStorage.getItem('globalUnsortedItems');
             if (newItemsData && newItemsData !== 'null') {
-                const parsed = JSON.parse(newItemsData);
+                const parsed = this.safeParseJSON(newItemsData, []);
                 newItemsCount = Array.isArray(parsed) ? parsed.length : 0;
             }
             
             // Get misc items (backburner unsorted items)
             const miscItemsData = localStorage.getItem('backburnerItems');
             if (miscItemsData && miscItemsData !== 'null') {
-                const parsed = JSON.parse(miscItemsData);
+                const parsed = this.safeParseJSON(miscItemsData, {unsortedItems: []});
                 if (parsed && parsed.unsortedItems && Array.isArray(parsed.unsortedItems)) {
                     miscItemsCount = parsed.unsortedItems.length;
                 } else if (Array.isArray(parsed)) {
@@ -1551,7 +1570,7 @@ class DailyTodoApp {
             // Get trash items
             const trashItemsData = localStorage.getItem('dailyTodos_trash');
             if (trashItemsData && trashItemsData !== 'null') {
-                const parsed = JSON.parse(trashItemsData);
+                const parsed = this.safeParseJSON(trashItemsData, {items: []});
                 if (parsed && Array.isArray(parsed.items)) {
                     trashItemsCount = parsed.items.length;
                 } else if (Array.isArray(parsed)) {
@@ -2345,31 +2364,19 @@ class DailyTodoApp {
     }
     
     saveBackburnerItems() {
-        // Load existing backburner data to preserve what's not visible in the current panel
-        const existingData = localStorage.getItem('backburnerItems');
+        // Build fresh backburner data from current DOM state only
+        // Don't preserve old sections - this prevents deleted sections from reappearing
         let backburnerData = {
             unsortedItems: [],
             sections: {}
         };
-        
-        if (existingData) {
-            try {
-                backburnerData = JSON.parse(existingData);
-                if (!backburnerData.sections) backburnerData.sections = {};
-                if (!backburnerData.unsortedItems) backburnerData.unsortedItems = [];
-            } catch (e) {
-                console.warn('Error parsing existing backburner data:', e);
-                backburnerData = { unsortedItems: [], sections: {} };
-            }
-        }
         
         // Update unsorted items if the backburner panel is visible
         if (this.backburnerUnsortedItems) {
             backburnerData.unsortedItems = this.serializeItems(this.backburnerUnsortedItems);
         }
         
-        // Update only currently visible backburner sections in the DOM
-        // Preserve existing sections that aren't currently rendered in the DOM
+        // Save only currently visible backburner sections in the DOM
         const sectionElements = document.querySelectorAll('[data-panel="backburner"]');
         
         sectionElements.forEach(section => {
@@ -2377,7 +2384,7 @@ class DailyTodoApp {
                 const sectionId = section.dataset.sectionId;
                 const sectionName = section.querySelector('.section-title').value;
                 
-                // Update this specific section in the data
+                // Add this section to the data
                 backburnerData.sections[sectionId] = {
                     id: sectionId,
                     name: sectionName,
@@ -2443,7 +2450,11 @@ class DailyTodoApp {
                             section.done.forEach(todo => {
                                 const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'backburner', todo.highPriority, todo.recurringTaskId);
                                 const doneColumn = sectionElement.querySelector('.section-done .items');
-                                if (doneColumn) doneColumn.appendChild(item);
+                                if (doneColumn) {
+                                    doneColumn.appendChild(item);
+                                    // Apply styling after item is in done column
+                                    this.applyDueDateStyling(item);
+                                }
                             });
                         } else {
                             console.warn(`Section element not found for section ID: ${section.id}`);
@@ -2676,7 +2687,10 @@ class DailyTodoApp {
                     section.done.forEach(todo => {
                         const item = this.createTodoItem(todo.text, todo.id, todo.createdAt, todo.sectionId, todo.itemId, todo.dueDate, todo.panel || 'todo', todo.highPriority, todo.recurringTaskId);
                         const sectionElement = document.querySelector(`[data-section-id="${section.id}"]`);
-                        sectionElement.querySelector('.section-done .items').appendChild(item);
+                        const doneColumn = sectionElement.querySelector('.section-done .items');
+                        doneColumn.appendChild(item);
+                        // Apply styling after item is in done column
+                        this.applyDueDateStyling(item);
                     });
                 });
             }
@@ -3647,7 +3661,7 @@ class DailyTodoApp {
             let existingSectionId = null;
             
             for (const [existingId, section] of Object.entries(todos.sections)) {
-                if (section.name === finalSectionName && existingId !== sectionId) {
+                if (section.name === finalSectionName.trim() && existingId !== sectionId) {
                     existingSectionId = existingId;
                     targetSectionId = existingId;
                     break;
@@ -3684,7 +3698,7 @@ class DailyTodoApp {
         // Find all sections with the same name
         const duplicateSections = [];
         for (const [id, section] of Object.entries(todos.sections)) {
-            if (section.name === sectionName && id !== keepSectionId) {
+            if (section.name === sectionName.trim() && id !== keepSectionId) {
                 duplicateSections.push(id);
             }
         }
@@ -4164,7 +4178,7 @@ class DailyTodoApp {
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
-                const rawData = JSON.parse(e.target.result);
+                const rawData = this.safeParseJSON(e.target.result, {});
                 
                 // Validate imported data structure
                 if (!rawData || typeof rawData !== 'object') {
@@ -4395,7 +4409,7 @@ class DailyTodoApp {
             // Find existing section with the same name or create a new one
             let sectionId = null;
             for (const [id, section] of Object.entries(todos.sections)) {
-                if (section.name === item.section_name) {
+                if (section.name === item.section_name.trim()) {
                     sectionId = id;
                     break;
                 }
@@ -4479,7 +4493,7 @@ class DailyTodoApp {
             // Find existing section with the same name or create a new one
             let sectionId = null;
             for (const [id, section] of Object.entries(backburnerData.sections)) {
-                if (section.name === item.section_name) {
+                if (section.name === item.section_name.trim()) {
                     sectionId = id;
                     break;
                 }
@@ -5739,6 +5753,7 @@ class DailyTodoApp {
                 
                 if (isInBackburnerPanel) {
                     // Update item panel when moved to backburner
+                    const originalPanel = draggedItem.dataset.panel;
                     draggedItem.dataset.panel = 'backburner';
                     // Update button in item if needed
                     const actions = draggedItem.querySelector('.item-actions');
@@ -5751,8 +5766,15 @@ class DailyTodoApp {
                         });
                     }
                     this.saveBackburnerItems();
+                    
+                    // Remove from source storage if coming from different panel
+                    if (originalPanel === 'todo') {
+                        this.removeItemFromTodoStorage(draggedItem.dataset.itemId, originalSectionId);
+                        this.saveTodosForDate();
+                    }
                 } else {
                     // Update item panel when moved to TODO
+                    const originalPanel = draggedItem.dataset.panel;
                     draggedItem.dataset.panel = 'todo';
                     // Update button in item if needed
                     const actions = draggedItem.querySelector('.item-actions');
@@ -5766,6 +5788,12 @@ class DailyTodoApp {
                     }
                     this.saveTodosForDate();
                     this.updateCalendarColors();
+                    
+                    // Remove from source storage if coming from different panel
+                    if (originalPanel === 'backburner') {
+                        this.removeItemFromBackburnerStorage(draggedItem.dataset.itemId, originalSectionId);
+                        this.saveBackburnerItems();
+                    }
                 }
                 // Trash is already saved above if item was restored from trash
             }
@@ -6382,7 +6410,9 @@ class DailyTodoApp {
                 if (!section) {
                     // If section doesn't exist, create it
                     const restoredSectionName = sectionName || this.getSectionName(sectionId) || 'Restored Section';
-                    section = this.createSection(restoredSectionName, sectionId);
+                    const result = this.createSection(restoredSectionName, sectionId);
+                    // When existingId is provided, createSection returns just the ID string
+                    section = document.querySelector(`[data-section-id="${result}"]`);
                 }
                 
                 // Determine which section column to restore to based on original column type
@@ -6513,7 +6543,7 @@ class DailyTodoApp {
             `<div class="recurring-indicator-wrapper"><span class="recurring-indicator" title="${recurringTaskId}"></span></div>` : '';
         
         item.innerHTML = `
-            <div class="todo-text">${this.escapeHtml(text)}</div>
+            <div class="todo-text">${this.linkifyText(this.escapeHtml(text))}</div>
             ${recurringIndicator}
             <div class="item-actions">
                 <button class="restore-btn" title="Restore to original location">↶</button>
@@ -6987,7 +7017,8 @@ class DailyTodoApp {
         
         // Create section in the same panel as the item
         const itemPanel = item.dataset.panel || 'todo';
-        const sectionId = this.createSection(sectionName, null, itemPanel);
+        const result = this.createSection(sectionName, null, itemPanel);
+        const sectionId = result.id || result;
         
         // Move the item to the appropriate column in the new section
         const columnType = this.getColumnType(item);
@@ -7044,7 +7075,8 @@ class DailyTodoApp {
         
         // Detect which panel is currently active and create section in that panel
         const currentPanel = !this.backburnerPanel.classList.contains('hidden') ? 'backburner' : 'todo';
-        const sectionId = this.createSection(sectionName, null, currentPanel);
+        const result = this.createSection(sectionName, null, currentPanel);
+        const sectionId = result.id || result;
         
         // Save to appropriate storage based on panel
         if (currentPanel === 'backburner') {
@@ -7064,10 +7096,15 @@ class DailyTodoApp {
             this.captureStateForUndo('section', `Create section "${name}"`);
         }
         
-        const sectionId = existingId || `section-${this.sectionCounter++}`;
+        const sectionId = existingId || `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const sectionsContainer = panel === 'todo' 
             ? document.getElementById('sectionsContainer')
             : document.getElementById('backburnerSectionsContainer');
+        
+        if (!sectionsContainer) {
+            console.error(`Cannot find sections container for panel: ${panel}`);
+            return null;
+        }
         
         const sectionRow = document.createElement('div');
         sectionRow.className = 'section-row';
@@ -7190,7 +7227,12 @@ class DailyTodoApp {
         // Update destination dropdowns when new section is created
         this.populateDestinationDropdowns();
         
-        return sectionId;
+        // For backward compatibility, return just the ID if existingId was provided (loading case)
+        // Otherwise return both ID and element for new sections
+        if (existingId) {
+            return sectionId;
+        }
+        return { id: sectionId, element: sectionRow };
     }
     
     handleSectionTitleChange(sectionId, title) {
@@ -7208,20 +7250,47 @@ class DailyTodoApp {
             return;
         }
         
-        // Find all sections with the same title in the same panel
+        // First check DOM for sections with the same title in the same panel
         const allSections = document.querySelectorAll(`.section-row[data-panel="${currentPanel}"]`);
-        const matchingSections = [];
+        let targetSectionId = null;
         
         allSections.forEach(section => {
             const sectionTitleInput = section.querySelector('.section-title');
-            if (sectionTitleInput && sectionTitleInput.value.trim() === title && section.dataset.sectionId !== sectionId) {
-                matchingSections.push(section);
+            if (sectionTitleInput && sectionTitleInput.value.trim() === title.trim() && section.dataset.sectionId !== sectionId) {
+                targetSectionId = section.dataset.sectionId;
             }
         });
         
-        if (matchingSections.length > 0) {
-            // Combine with the first matching section
-            this.combineSections(sectionId, matchingSections[0].dataset.sectionId);
+        // If no matching section found in DOM, check storage as well
+        if (!targetSectionId) {
+            if (currentPanel === 'backburner') {
+                const backburnerData = JSON.parse(localStorage.getItem('backburnerItems') || '{"unsortedItems": [], "sections": {}}');
+                if (backburnerData.sections) {
+                    for (const [id, section] of Object.entries(backburnerData.sections)) {
+                        if (section.name === title.trim() && id !== sectionId) {
+                            targetSectionId = id;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                // Check current date's todos storage
+                const currentDate = this.currentDate.toISOString().split('T')[0];
+                const todosData = JSON.parse(localStorage.getItem(`dailyTodos_${currentDate}`) || '{"sections": {}}');
+                if (todosData.sections) {
+                    for (const [id, section] of Object.entries(todosData.sections)) {
+                        if (section.name === title.trim() && id !== sectionId) {
+                            targetSectionId = id;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (targetSectionId) {
+            // Combine with the matching section
+            this.combineSections(sectionId, targetSectionId);
         } else {
             // Save using appropriate method based on panel
             if (currentPanel === 'backburner') {
@@ -7274,7 +7343,9 @@ class DailyTodoApp {
     
     deleteSection(sectionId) {
         const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
-        const sectionName = sectionElement.querySelector('.section-title').value;
+        const titleElement = sectionElement.querySelector('.section-title');
+        if (!titleElement) return;
+        const sectionName = titleElement.value;
         
         this.showCustomConfirm(
             `Delete section "${sectionName}"?\n\nAll items in this section will be moved back to the main columns.`,
@@ -7322,7 +7393,9 @@ class DailyTodoApp {
     
     moveSectionToNextDay(sectionId) {
         const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
-        const sectionName = sectionElement.querySelector('.section-title').value;
+        const titleElement = sectionElement.querySelector('.section-title');
+        if (!titleElement) return;
+        const sectionName = titleElement.value;
         
         this.captureStateForUndo('move', `Move section "${sectionName}" to next day`);
         
@@ -7609,7 +7682,9 @@ class DailyTodoApp {
     
     moveSectionToDate(sectionId, targetDate) {
         const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
-        const sectionName = sectionElement.querySelector('.section-title').value;
+        const titleElement = sectionElement.querySelector('.section-title');
+        if (!titleElement) return;
+        const sectionName = titleElement.value;
         const dateStr = this.formatDateShort(targetDate);
         
         this.captureStateForUndo('move', `Move section "${sectionName}" to ${dateStr}`);
@@ -7702,7 +7777,7 @@ class DailyTodoApp {
         // Check if there's already a section with the same name to combine with
         let targetSectionId = null;
         for (const [existingId, section] of Object.entries(todos.sections)) {
-            if (section.name === sectionData.name) {
+            if (section.name === sectionData.name.trim()) {
                 targetSectionId = existingId;
                 break;
             }
@@ -8094,18 +8169,29 @@ class DailyTodoApp {
         
         this.captureStateForUndo('move', `Move "${text}" to backburner`);
         
-        // Remove item from todo storage FIRST before adding to backburner
-        if (item.dataset.panel === 'todo') {
-            this.removeItemFromTodoStorage(itemId, sectionId);
-        }
+        // NOTE: Add to destination storage FIRST, then remove from source
+        // This prevents data loss if operation fails partway through
         
         if (sectionId) {
             // Move to existing section with same name or create new section (following moveItemToTodo pattern)
             const originalSection = document.querySelector(`[data-section-id="${sectionId}"]`);
             if (originalSection) {
-                const sectionName = originalSection.querySelector('.section-title').value;
+                const titleElement = originalSection.querySelector('.section-title');
+                if (!titleElement) return;
+                const sectionName = titleElement.value;
                 
-                // Get existing backburner data to check for existing section
+                // Check if there's already a section with the same name in backburner (check DOM first)
+                let targetSectionId = null;
+                const existingBackburnerSections = document.querySelectorAll('.section-row[data-panel="backburner"]');
+                
+                existingBackburnerSections.forEach(section => {
+                    const titleInput = section.querySelector('.section-title');
+                    if (titleInput && titleInput.value.trim() === sectionName.trim()) {
+                        targetSectionId = section.dataset.sectionId;
+                    }
+                });
+                
+                // Get backburner data (needed for both finding existing section and updating later)
                 const existingData = localStorage.getItem('backburnerItems');
                 let backburnerData = { sections: {} };
                 if (existingData) {
@@ -8113,12 +8199,13 @@ class DailyTodoApp {
                     if (!backburnerData.sections) backburnerData.sections = {};
                 }
                 
-                // Look for existing section with same name in backburner data
-                let targetSectionId = null;
-                for (const [id, section] of Object.entries(backburnerData.sections)) {
-                    if (section.name === sectionName) {
-                        targetSectionId = id;
-                        break;
+                // If no existing section found in DOM, check storage as well
+                if (!targetSectionId) {
+                    for (const [id, section] of Object.entries(backburnerData.sections)) {
+                        if (section.name === sectionName.trim()) {
+                            targetSectionId = id;
+                            break;
+                        }
                     }
                 }
                 
@@ -8143,6 +8230,11 @@ class DailyTodoApp {
                 // Add to backburner storage with proper section association
                 this.addItemToBackburnerStorage(backburnerItem, targetColumnType, targetSectionId);
                 
+                // Now that item is safely in destination, remove from source storage
+                if (item.dataset.panel === 'todo') {
+                    this.removeItemFromTodoStorage(itemId, sectionId);
+                }
+                
                 // Update section name in storage if we created it
                 if (!backburnerData.sections[targetSectionId]) {
                     const updatedData = JSON.parse(localStorage.getItem('backburnerItems'));
@@ -8159,6 +8251,11 @@ class DailyTodoApp {
             
             // Move to misc items (add to backburner storage directly)
             this.addItemToBackburnerStorage(backburnerItem, 'unsorted');
+            
+            // Now that item is safely in destination, remove from source storage
+            if (item.dataset.panel === 'todo') {
+                this.removeItemFromTodoStorage(itemId, sectionId);
+            }
         }
         
         // Remove original item
@@ -8185,21 +8282,32 @@ class DailyTodoApp {
         
         this.captureStateForUndo('move', `Move "${text}" to TODO`);
         
-        // Remove item from backburner storage FIRST before adding to todo
-        if (item.dataset.panel === 'backburner') {
-            this.removeItemFromBackburnerStorage(itemId, sectionId);
-        }
+        // NOTE: Add to destination storage FIRST, then remove from source
+        // This prevents data loss if operation fails partway through
         
         if (sectionId) {
             // Move to section under present day (today)
             const originalSection = document.querySelector(`[data-section-id="${sectionId}"]`);
             if (originalSection) {
-                const sectionName = originalSection.querySelector('.section-title').value;
+                const titleElement = originalSection.querySelector('.section-title');
+                if (!titleElement) return;
+                const sectionName = titleElement.value;
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 const todayKey = today.toISOString().split('T')[0];
                 
-                // Get existing todos for today to check for existing section
+                // Check if there's already a section with the same name in today's todo (check DOM first)
+                let targetSectionId = null;
+                const existingTodoSections = document.querySelectorAll('.section-row[data-panel="todo"]');
+                
+                existingTodoSections.forEach(section => {
+                    const titleInput = section.querySelector('.section-title');
+                    if (titleInput && titleInput.value.trim() === sectionName.trim()) {
+                        targetSectionId = section.dataset.sectionId;
+                    }
+                });
+                
+                // Get today's todo data (needed for both finding existing section and updating later)
                 const existingData = localStorage.getItem(`dailyTodos_${todayKey}`);
                 let todos = { sections: {} };
                 if (existingData) {
@@ -8207,12 +8315,13 @@ class DailyTodoApp {
                     if (!todos.sections) todos.sections = {};
                 }
                 
-                // Look for existing section with same name in today's data
-                let targetSectionId = null;
-                for (const [id, section] of Object.entries(todos.sections)) {
-                    if (section.name === sectionName) {
-                        targetSectionId = id;
-                        break;
+                // If no existing section found in DOM, check storage as well
+                if (!targetSectionId) {
+                    for (const [id, section] of Object.entries(todos.sections)) {
+                        if (section.name === sectionName.trim()) {
+                            targetSectionId = id;
+                            break;
+                        }
                     }
                 }
                 
@@ -8227,6 +8336,11 @@ class DailyTodoApp {
                 
                 // Always place in todo column when moving from backburner
                 this.addItemToDateStorage(todayKey, todoItem, 'todo', targetSectionId);
+                
+                // Now that item is safely in destination, remove from source storage
+                if (item.dataset.panel === 'backburner') {
+                    this.removeItemFromBackburnerStorage(itemId, sectionId);
+                }
                 
                 // Update section name in storage if we created it
                 if (!todos.sections[targetSectionId]) {
@@ -8247,6 +8361,11 @@ class DailyTodoApp {
             today.setHours(0, 0, 0, 0);
             const todayKey = today.toISOString().split('T')[0];
             this.addItemToDateStorage(todayKey, todoItem, 'todo');
+            
+            // Now that item is safely in destination, remove from source storage
+            if (item.dataset.panel === 'backburner') {
+                this.removeItemFromBackburnerStorage(itemId, sectionId);
+            }
         }
         
         // Remove original item
@@ -8268,17 +8387,71 @@ class DailyTodoApp {
         const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
         if (!sectionElement) return;
         
-        const sectionName = sectionElement.querySelector('.section-title').value;
+        const titleElement = sectionElement.querySelector('.section-title');
+        if (!titleElement) return;
+        const sectionName = titleElement.value;
         this.captureStateForUndo('move', `Move section "${sectionName}" to backburner`);
         
-        // Create new backburner section
-        const backburnerSectionId = this.createSection(sectionName, null, 'backburner');
-        const backburnerSection = document.querySelector(`[data-section-id="${backburnerSectionId}"]`);
+        // Check if there's already a section with the same name in backburner
+        let targetSectionId = null;
+        const existingBackburnerSections = document.querySelectorAll('.section-row[data-panel="backburner"]');
+        
+        existingBackburnerSections.forEach(section => {
+            const titleInput = section.querySelector('.section-title');
+            if (titleInput && titleInput.value.trim() === sectionName.trim()) {
+                targetSectionId = section.dataset.sectionId;
+            }
+        });
+        
+        // If no existing section found, check in storage as well
+        if (!targetSectionId) {
+            const backburnerData = JSON.parse(localStorage.getItem('backburnerItems') || '{"unsortedItems": [], "sections": {}}');
+            if (backburnerData.sections) {
+                for (const [id, section] of Object.entries(backburnerData.sections)) {
+                    if (section.name === sectionName.trim()) {
+                        targetSectionId = id;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Create new section if none exists, otherwise use existing one
+        let backburnerSectionId = targetSectionId;
+        let backburnerSection = null;
+        
+        if (targetSectionId) {
+            // Use existing section
+            backburnerSection = document.querySelector(`[data-section-id="${targetSectionId}"]`);
+        } else {
+            // Create new section
+            const result = this.createSection(sectionName, null, 'backburner');
+            if (!result) {
+                console.error('Failed to create backburner section');
+                this.showFeedback('Error: Could not create backburner section', 'error');
+                return;
+            }
+            // Use the element directly from the result
+            backburnerSectionId = result.id || result;
+            backburnerSection = result.element || document.querySelector(`[data-section-id="${backburnerSectionId}"]`);
+        }
+        
+        // Check if backburner section was created/found successfully
+        if (!backburnerSection) {
+            console.error(`Failed to find backburner section with ID: ${backburnerSectionId}`);
+            this.showFeedback(`Error: Could not find or create backburner section`, 'error');
+            return;
+        }
         
         // Move all items from each column
         ['todo', 'inProgress', 'done'].forEach(columnType => {
             const sourceColumn = sectionElement.querySelector(`.section-${columnType === 'inProgress' ? 'in-progress' : columnType} .items`);
             const targetColumn = backburnerSection.querySelector(`.section-${columnType === 'inProgress' ? 'in-progress' : columnType} .items`);
+            
+            if (!sourceColumn || !targetColumn) {
+                console.warn(`Could not find columns for type: ${columnType}`);
+                return;
+            }
             
             Array.from(sourceColumn.children).forEach(item => {
                 // Update item panel
@@ -8314,13 +8487,26 @@ class DailyTodoApp {
         const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
         if (!sectionElement) return;
         
-        const sectionName = sectionElement.querySelector('.section-title').value;
+        const titleElement = sectionElement.querySelector('.section-title');
+        if (!titleElement) return;
+        const sectionName = titleElement.value;
         this.captureStateForUndo('move', `Move section "${sectionName}" to TODO`);
         
         // Get today's date
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayKey = today.toISOString().split('T')[0];
+        
+        // Check if there's already a section with the same name in today's todo (check DOM first)
+        let targetSectionId = null;
+        const existingTodoSections = document.querySelectorAll('.section-row[data-panel="todo"]');
+        
+        existingTodoSections.forEach(section => {
+            const titleInput = section.querySelector('.section-title');
+            if (titleInput && titleInput.value.trim() === sectionName.trim()) {
+                targetSectionId = section.dataset.sectionId;
+            }
+        });
         
         // Get existing todos for today
         const existingData = localStorage.getItem(`dailyTodos_${todayKey}`);
@@ -8330,12 +8516,13 @@ class DailyTodoApp {
             if (!todos.sections) todos.sections = {};
         }
         
-        // Look for existing section with same name or create new one
-        let targetSectionId = null;
-        for (const [id, section] of Object.entries(todos.sections)) {
-            if (section.name === sectionName) {
-                targetSectionId = id;
-                break;
+        // If no existing section found in DOM, check storage as well
+        if (!targetSectionId) {
+            for (const [id, section] of Object.entries(todos.sections)) {
+                if (section.name === sectionName.trim()) {
+                    targetSectionId = id;
+                    break;
+                }
             }
         }
         
@@ -8413,7 +8600,9 @@ class DailyTodoApp {
         // Only delete if section is completely empty (no todo, in-progress, or done items)
         // If section has done items, keep it - no warning needed
         if (todoItems === 0 && inProgressItems === 0 && doneItems === 0) {
-            const sectionName = originalSection.querySelector('.section-title').value;
+            const titleElement = originalSection.querySelector('.section-title');
+            if (!titleElement) return;
+            const sectionName = titleElement.value;
             const message = `The section "${sectionName}" is now empty. Would you like to delete the empty section?`;
             
             this.showCustomConfirm(
@@ -8558,7 +8747,9 @@ class DailyTodoApp {
         
         // If section only has done items or is completely empty, ask if user wants to delete it
         if (todoItems === 0 && inProgressItems === 0) {
-            const sectionName = originalSection.querySelector('.section-title').value;
+            const titleElement = originalSection.querySelector('.section-title');
+            if (!titleElement) return;
+            const sectionName = titleElement.value;
             const hasOnlyDoneItems = doneItems > 0;
             
             let message;
@@ -9423,20 +9614,21 @@ class DailyTodoApp {
             // Set up autosave interval only if enabled
             if (this.autosaveEnabled) {
                 this.autosaveInterval = setInterval(() => {
-                    const currentlyEnabled = localStorage.getItem('autosaveEnabled') === 'true';
-                    if (currentlyEnabled) {
-                        this.performAutosave();
-                    }
+                    this.performAutosave();
                 }, intervalMs);
             }
             
-            // Also save when the page is about to unload
-            window.addEventListener('beforeunload', () => {
-                const currentlyEnabled = localStorage.getItem('autosaveEnabled') === 'true';
-                if (currentlyEnabled && this.autosaveFileHandle) {
-                    this.performAutosave();
-                }
-            });
+            // Also save when the page is about to unload  
+            if (!this.beforeUnloadListenerAdded) {
+                window.addEventListener('beforeunload', () => {
+                    this.cleanupTimers();
+                    const currentlyEnabled = localStorage.getItem('autosaveEnabled') === 'true';
+                    if (currentlyEnabled && this.autosaveFileHandle) {
+                        this.performAutosave();
+                    }
+                });
+                this.beforeUnloadListenerAdded = true;
+            }
         }
     }
     
@@ -9466,10 +9658,7 @@ class DailyTodoApp {
         // Only set up new interval if autosave is enabled and API is supported
         if (this.isFileSystemAccessSupported() && isEnabled) {
             this.autosaveInterval = setInterval(() => {
-                const currentlyEnabled = localStorage.getItem('autosaveEnabled') === 'true';
-                if (currentlyEnabled) {
-                    this.performAutosave();
-                }
+                this.performAutosave();
             }, intervalMs);
             
             console.log(`Autosave interval restarted: ${intervalMs}ms (${intervalMs/1000}s)`);
@@ -9566,12 +9755,19 @@ class DailyTodoApp {
             if (this.isElectronMode()) {
                 // Electron mode - use file path
                 if (this.autosaveFilePath) {
-                    const result = await window.electronAPI.saveToFile(this.autosaveFilePath, jsonString);
+                    // Generate new filename with timestamp for each save
+                    const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
+                    const originalPath = this.autosaveFilePath;
+                    const pathParts = originalPath.split(/[\\/]/);
+                    const directory = pathParts.slice(0, -1).join('/');
+                    const newFilePath = `${directory}/todo-autosave-${timestamp}.json`;
+                    
+                    const result = await window.electronAPI.saveToFile(newFilePath, jsonString);
                     if (result.success) {
                         this.showFeedback('Autosaved to file', 'success');
                         localStorage.setItem('lastAutosaveTime', new Date().toISOString());
                         await this.updateAutosaveStatus();
-                        console.log("Autosaved: ", new Date().toISOString());
+                        console.log("Autosaved to: ", newFilePath);
                     } else {
                         console.error('Autosave failed:', result.error);
                         this.showFeedback('Autosave failed: ' + result.error, 'error');
@@ -9579,6 +9775,8 @@ class DailyTodoApp {
                 }
             } else {
                 // Browser mode - use file handle
+                // Note: Browser File System API doesn't support creating new files without user interaction,
+                // so we continue to overwrite the same file. Use Electron mode for timestamped saves.
                 if (this.autosaveFileHandle) {
                     const writable = await this.autosaveFileHandle.createWritable();
                     await writable.write(jsonString);
@@ -9627,7 +9825,7 @@ class DailyTodoApp {
                             }
                         }
                     ],
-                    suggestedName: `todo-autosave-${new Date().toISOString().split('T')[0]}.json`
+                    suggestedName: `todo-autosave-${new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-')}.json`
                 };
                 
                 this.autosaveFileHandle = await window.showSaveFilePicker(options);
@@ -10804,6 +11002,30 @@ class DailyTodoApp {
             document.body.classList.add('dark-mode');
         } else {
             document.body.classList.remove('dark-mode');
+        }
+    }
+    
+    // Cleanup method to clear all timers and intervals
+    cleanupTimers() {
+        if (this.trashReorganizeInterval) {
+            clearInterval(this.trashReorganizeInterval);
+            this.trashReorganizeInterval = null;
+        }
+        if (this.autosaveInterval) {
+            clearInterval(this.autosaveInterval);
+            this.autosaveInterval = null;
+        }
+        if (this.pomodoroInterval) {
+            clearInterval(this.pomodoroInterval);
+            this.pomodoroInterval = null;
+        }
+        if (this.autoScrollInterval) {
+            clearInterval(this.autoScrollInterval);
+            this.autoScrollInterval = null;
+        }
+        if (this.debugExportTimeout) {
+            clearTimeout(this.debugExportTimeout);
+            this.debugExportTimeout = null;
         }
     }
 }
